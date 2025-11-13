@@ -12,10 +12,20 @@ import { SystemManagement } from "./resources/management/SystemManagement";
 import ProfilePage from "./resources/profile";
 import { dataProvider } from "./data/provider";
 
+const BASENAME = (() => {
+  const base = import.meta.env.BASE_URL ?? "/";
+  let b = base;
+  if (b === "./" || b === "/./") b = "/";
+  b = b.replace(/\/+$/, "");
+  if (b === "") b = "/";
+  if (b !== "/" && !b.startsWith("/")) b = `/${b}`;
+  return b === "/" ? undefined : b;
+})();
+
 export const App = () => (
   <Admin
     layout={Layout}
-    basename={import.meta.env.BASE_URL}
+    basename={BASENAME}
     authProvider={authProvider}
     dataProvider={dataProvider}
     loginPage={LoginPage}

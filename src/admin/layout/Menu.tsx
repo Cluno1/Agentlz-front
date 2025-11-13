@@ -22,11 +22,7 @@ export const Menu = () => {
   return (
     <RAMenu>
       <RAMenu.DashboardItem primaryText={translate("menu.dashboard")} />
-      <RAMenu.Item
-        to="/profile"
-        primaryText={translate("menu.profile")}
-        leftIcon={<AccountCircle />}
-      />
+
       <RAMenu.Item
         to="/agent"
         primaryText={translate("menu.agent")}
@@ -61,6 +57,11 @@ export const Menu = () => {
           />
         </SubMenu>
       )}
+      <RAMenu.Item
+        to="/profile"
+        primaryText={translate("menu.profile")}
+        leftIcon={<AccountCircle />}
+      />
     </RAMenu>
   );
 };

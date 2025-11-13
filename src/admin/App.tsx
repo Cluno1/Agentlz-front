@@ -65,37 +65,44 @@ export const App = () => (
         </ArcoLocaleBridge>
       }
     />
+    <Resource
+      name="profile"
+      list={
+        <ArcoLocaleBridge>
+          <ProfilePage />
+        </ArcoLocaleBridge>
+      }
+      edit={<ProfileEdit />}
+    />
+    <Resource
+      name="create"
+      list={
+        <ArcoLocaleBridge>
+          <CreatePage />
+        </ArcoLocaleBridge>
+      }
+    />
+    <Resource
+      name="agent"
+      list={
+        <ArcoLocaleBridge>
+          <AgentPage />
+        </ArcoLocaleBridge>
+      }
+    />
+    <Resource
+      name="mcp-tools"
+      list={
+        <ArcoLocaleBridge>
+          <McpToolsPage />
+        </ArcoLocaleBridge>
+      }
+    />
+
     {/* 公开路由：注册页（不需要认证） */}
-    <CustomRoutes noLayout>
-      <Route path="/register" element={<RegisterPage />} />
-    </CustomRoutes>
+
     <CustomRoutes>
-      <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/profile/edit" element={<ProfileEdit />} />
-      <Route
-        path="/agent"
-        element={
-          <ArcoLocaleBridge>
-            <AgentPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/mcp-tools"
-        element={
-          <ArcoLocaleBridge>
-            <McpToolsPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/create"
-        element={
-          <ArcoLocaleBridge>
-            <CreatePage />
-          </ArcoLocaleBridge>
-        }
-      />
+      <Route path="/register" element={<RegisterPage />} />
     </CustomRoutes>
   </Admin>
 );

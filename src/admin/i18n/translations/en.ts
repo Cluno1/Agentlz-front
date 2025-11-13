@@ -13,6 +13,9 @@ export default {
     systemManagement: "System Management",
     Management: "Management",
     userManagement: "User Management",
+    agent: "Agent",
+    mcpTools: "MCP Tools",
+    create: "Create",
   },
   profile: {
     title: "Profile",
@@ -108,5 +111,17 @@ export default {
       },
       submit: "Create",
     },
+  },
+  agent: {
+    title: "Agent",
+    placeholder: "This is a placeholder content for Agent page.",
+  },
+  mcpTools: {
+    title: "MCP Tools",
+    placeholder: "This is a placeholder content for MCP Tools page.",
+  },
+  create: {
+    title: "Create",
+    placeholder: "This is a placeholder content for Create page.",
   },
 };

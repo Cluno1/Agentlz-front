@@ -1,0 +1,16 @@
+import { Card, Typography } from "@arco-design/web-react";
+import { useTranslate } from "react-admin";
+
+const McpToolsPage = () => {
+  const translate = useTranslate();
+  return (
+    <div className="p-4 space-y-4">
+      <Typography.Title heading={4}>{translate("mcpTools.title")}</Typography.Title>
+      <Card className="shadow-sm">
+        <div className="text-gray-600">{translate("mcpTools.placeholder")}</div>
+      </Card>
+    </div>
+  );
+};
+
+export default McpToolsPage;

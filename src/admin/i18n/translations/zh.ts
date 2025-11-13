@@ -13,6 +13,9 @@ export default {
     systemManagement: "系统管理",
     Management: "管理",
     userManagement: "用户管理",
+    agent: "智能体",
+    mcpTools: "mcp工具",
+    create: "创造",
   },
   profile: {
     title: "个人资料",
@@ -108,5 +111,17 @@ export default {
       },
       submit: "创建",
     },
+  },
+  agent: {
+    title: "智能体",
+    placeholder: "这里是智能体页面的占位内容。",
+  },
+  mcpTools: {
+    title: "mcp工具",
+    placeholder: "这里是 mcp 工具页面的占位内容。",
+  },
+  create: {
+    title: "创造",
+    placeholder: "这里是创造页面的占位内容。",
   },
 };

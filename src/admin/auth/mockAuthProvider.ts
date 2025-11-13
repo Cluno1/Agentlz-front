@@ -75,8 +75,13 @@ export const authProvider: AuthProvider = {
       JSON.stringify({
         id: user.id,
         fullName: user.fullName,
+        disabled: user.disabled,
+        email: user.email,
+        username: user.username,
         avatar: user.avatar,
         role: user.role,
+        createdAt: user.createdAt,
+        createdById: user.createdById,
       }),
     );
     return Promise.resolve();
@@ -100,14 +105,18 @@ export const authProvider: AuthProvider = {
     }
     return Promise.resolve("user");
   },
-  getIdentity: async () => {
+  getIdentity: async (): Promise<MockUser> => {
     try {
       const raw = localStorage.getItem(IDENTITY_KEY);
+      console.log(JSON.parse(raw || ""), "raw ??");
       return raw
         ? Promise.resolve(JSON.parse(raw))
-        : Promise.resolve({ id: "", fullName: "" });
+        : Promise.resolve({
+            id: "",
+            username: "",
+          });
     } catch {
-      return Promise.resolve({ id: "", fullName: "" });
+      return Promise.resolve({ id: "", username: "" });
     }
   },
 };

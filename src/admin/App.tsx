@@ -16,6 +16,9 @@ import { i18nProvider } from "./i18n/i18nProvider";
 import { ConfigProvider } from "@arco-design/web-react";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
+import AgentPage from "./resources/agent/AgentPage";
+import McpToolsPage from "./resources/tools/McpToolsPage";
+import CreatePage from "./resources/create/CreatePage";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -69,6 +72,30 @@ export const App = () => (
     <CustomRoutes>
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/edit" element={<ProfileEdit />} />
+      <Route
+        path="/agent"
+        element={
+          <ArcoLocaleBridge>
+            <AgentPage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Route
+        path="/mcp-tools"
+        element={
+          <ArcoLocaleBridge>
+            <McpToolsPage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Route
+        path="/create"
+        element={
+          <ArcoLocaleBridge>
+            <CreatePage />
+          </ArcoLocaleBridge>
+        }
+      />
     </CustomRoutes>
   </Admin>
 );

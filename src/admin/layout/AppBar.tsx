@@ -24,17 +24,21 @@ const ProfileUserButton = () => {
       <Menu.Item key="logout">{translate("menu.logout")}</Menu.Item>
     </Menu>
   );
-
+  console.log(identity, "identity");
   return (
     <Dropdown droplist={droplist} position="br" trigger="click">
       <Avatar size={40}>
         <img
           src={identity?.avatar}
-          alt={identity?.fullName || translate("menu.profile")}
+          alt={
+            identity?.fullName ||
+            identity?.username ||
+            translate("menu.profile")
+          }
         />
       </Avatar>
       <span style={{ marginLeft: 8 }}>
-        {identity?.fullName || translate("menu.profile")}
+        {identity?.fullName || identity?.username || translate("menu.profile")}
       </span>
     </Dropdown>
   );

@@ -15,6 +15,7 @@ import { dataProvider } from "./data/provider";
 export const App = () => (
   <Admin
     layout={Layout}
+    basename={import.meta.env.BASE_URL}
     authProvider={authProvider}
     dataProvider={dataProvider}
     loginPage={LoginPage}

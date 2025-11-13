@@ -29,6 +29,15 @@ importers:
       echarts-for-react:
         specifier: ^3.0.5
         version: 3.0.5(echarts@6.0.0)(react@18.3.1)
+      ra-i18n-polyglot:
+        specifier: ^5.12.3
+        version: 5.12.3(react-dom@18.3.1(react@18.3.1))(react-hook-form@7.66.0(react@18.3.1))(react-router-dom@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      ra-language-chinese:
+        specifier: ^2.0.10
+        version: 2.0.10
+      ra-language-english:
+        specifier: ^5.12.3
+        version: 5.12.3(react-dom@18.3.1(react@18.3.1))(react-hook-form@7.66.0(react@18.3.1))(react-router-dom@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1745,6 +1754,9 @@ packages:
 
   ra-i18n-polyglot@5.12.3:
     resolution: {integrity: sha512-4VfajtIVRUz4HFo3uh9RKFYBd9mOQG/oPF/rJhi0dXUDrv+ds2jqzHWPsGuK8F4fiUSxNOqiLVMqM6XxI8xHSg==}
+
+  ra-language-chinese@2.0.10:
+    resolution: {integrity: sha512-k+X6XdkBEZnmpKIJZj9Lb77Lj8LCmterilJTj2ovp3i8/H/dLo9IujASfjFypjHnVUpN7Y63LT19kgPrS6+row==}
 
   ra-language-english@5.12.3:
     resolution: {integrity: sha512-bhp9ppvZovGTK7forDOWsJjwnt7EXt2dJ09Vyl4YUebZp5QQQmVmukki9cqS6sNlvFrI2MTKwE85Tcuciwx9qQ==}
@@ -3993,6 +4005,8 @@ snapshots:
       - react-hook-form
       - react-router
       - react-router-dom
+
+  ra-language-chinese@2.0.10: {}
 
   ra-language-english@5.12.3(react-dom@18.3.1(react@18.3.1))(react-hook-form@7.66.0(react@18.3.1))(react-router-dom@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-router@7.9.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1):
     dependencies:

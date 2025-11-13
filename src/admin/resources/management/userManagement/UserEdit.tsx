@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
+import { useTranslate } from "react-admin";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, Form, Input, Button, Message, Select, Switch } from "@arco-design/web-react";
 import usersApi from "../../../api/users";
@@ -11,6 +12,7 @@ const UserEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslate();
 
   useEffect(() => {
     const load = async () => {
@@ -22,7 +24,7 @@ const UserEdit = () => {
         }
         setError(null);
       } catch (e: any) {
-        setError(e?.message || "加载失败");
+        setError(e?.message || t("userManagement.editPage.messages.loadError"));
       } finally {
         setLoading(false);
       }
@@ -35,52 +37,52 @@ const UserEdit = () => {
       if (!id) return;
       setSaving(true);
       await usersApi.updateUser(id, values);
-      Message.success("保存成功");
+      Message.success(t("userManagement.editPage.messages.saveSuccess"));
       navigate("/user-management");
     } catch (e: any) {
-      Message.error(e?.message || "保存失败");
+      Message.error(e?.message || t("userManagement.editPage.messages.saveError"));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Card title="编辑用户">
-      {loading && <p>加载中...</p>}
-      {error && <p>加载出错：{error}</p>}
+    <Card title={t("userManagement.editPage.title")}>
+      {loading && <p>{t("common.loading")}</p>}
+      {error && <p>{error}</p>}
       {!loading && !error && (
         <Form form={form} onSubmit={handleSubmit} layout="vertical">
           <Form.Item
-            label="用户名"
+            label={t("userManagement.editPage.fields.username")}
             field="username"
             rules={[{ required: true }]}
           >
             <Input />
           </Form.Item>
-          <Form.Item label="邮箱" field="email">
+          <Form.Item label={t("userManagement.editPage.fields.email")} field="email">
             <Input />
           </Form.Item>
-          <Form.Item label="姓名" field="fullName">
+          <Form.Item label={t("userManagement.editPage.fields.fullName")} field="fullName">
             <Input />
           </Form.Item>
-          <Form.Item label="角色" field="role">
+          <Form.Item label={t("userManagement.editPage.fields.role")} field="role">
             <Select style={{ width: "100%" }} allowClear>
-              <Select.Option value="admin">admin</Select.Option>
-              <Select.Option value="user">user</Select.Option>
+              <Select.Option value="admin">{t("user.role.admin")}</Select.Option>
+              <Select.Option value="user">{t("user.role.user")}</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item label="头像链接" field="avatar">
+          <Form.Item label={t("userManagement.editPage.fields.avatar")} field="avatar">
             <Input placeholder="https://avatars.githubusercontent.com/u/12345?v=4" />
           </Form.Item>
-          <Form.Item label="禁用登录" field="disabled" triggerPropName="checked">
+          <Form.Item label={t("userManagement.editPage.fields.disabled")} field="disabled" triggerPropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item label="创建时间" field="createdAt">
+          <Form.Item label={t("userManagement.editPage.fields.createdAt")} field="createdAt">
             <Input disabled />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={saving}>
-              保存
+              {t("common.save")}
             </Button>
           </Form.Item>
         </Form>

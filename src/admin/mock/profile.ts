@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { MockUser } from "../src/admin/data/types/user.d.ts";
+import type { MockUser } from "../data/types/user";
 
 const PROFILE_KEY = "mock_profile";
 
@@ -54,7 +55,9 @@ export const updateProfile = async (params: { data: Partial<MockUser> }) => {
   return rest;
 };
 
-export const changePassword = async (params: { data: { currentPassword: string; newPassword: string } }) => {
+export const changePassword = async (params: {
+  data: { currentPassword: string; newPassword: string };
+}) => {
   seedProfile();
   const current = read();
   if (!current) throw new Error("Profile not found");
@@ -68,4 +71,3 @@ export const changePassword = async (params: { data: { currentPassword: string; 
 };
 
 export default { getProfile, updateProfile, changePassword, seedProfile };
-

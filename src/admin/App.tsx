@@ -1,4 +1,4 @@
-import { Admin, CustomRoutes, Resource } from "react-admin";
+import { Admin, CustomRoutes, Resource, useLocale } from "react-admin";
 import { Route } from "react-router-dom";
 import { Layout } from "./layout/Layout";
 import { authProvider } from "./auth/mockAuthProvider";
@@ -10,7 +10,12 @@ import UserCreate from "./resources/management/userManagement/UserCreate";
 import UserEdit from "./resources/management/userManagement/UserEdit";
 import { SystemManagement } from "./resources/management/SystemManagement";
 import ProfilePage from "./resources/profile";
+import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
+import { i18nProvider } from "./i18n/i18nProvider";
+import { ConfigProvider } from "@arco-design/web-react";
+import zhCN from "@arco-design/web-react/es/locale/zh-CN";
+import enUS from "@arco-design/web-react/es/locale/en-US";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -22,28 +27,48 @@ const BASENAME = (() => {
   return b === "/" ? undefined : b;
 })();
 
+const ArcoLocaleBridge = ({ children }: { children: React.ReactNode }) => {
+  const locale = useLocale();
+  console.log(locale, "locale");
+  const arcoLocale = locale === "en" ? enUS : zhCN;
+  return <ConfigProvider locale={arcoLocale}>{children}</ConfigProvider>;
+};
+
 export const App = () => (
   <Admin
     layout={Layout}
     basename={BASENAME}
     authProvider={authProvider}
     dataProvider={dataProvider}
+    i18nProvider={i18nProvider}
     loginPage={LoginPage}
     dashboard={DashboardPage}
   >
     <Resource
       name="user-management"
-      list={<UserManagement />}
+      list={
+        <ArcoLocaleBridge>
+          <UserManagement />
+        </ArcoLocaleBridge>
+      }
       create={<UserCreate />}
       edit={<UserEdit />}
     />
-    <Resource name="system-management" list={<SystemManagement />} />
+    <Resource
+      name="system-management"
+      list={
+        <ArcoLocaleBridge>
+          <SystemManagement />
+        </ArcoLocaleBridge>
+      }
+    />
     {/* 公开路由：注册页（不需要认证） */}
     <CustomRoutes noLayout>
       <Route path="/register" element={<RegisterPage />} />
     </CustomRoutes>
     <CustomRoutes>
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/profile/edit" element={<ProfileEdit />} />
     </CustomRoutes>
   </Admin>
 );

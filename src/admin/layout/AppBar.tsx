@@ -1,13 +1,17 @@
-import { AppBar as RAAppBar, useGetIdentity, useLogout } from "react-admin";
-import { Button } from "@mui/material";
-import { AccountCircle } from "@mui/icons-material";
+import {
+  AppBar as RAAppBar,
+  useGetIdentity,
+  useLogout,
+  useTranslate,
+} from "react-admin";
 import { useNavigate } from "react-router-dom";
-import { Dropdown, Menu } from "@arco-design/web-react";
+import { Avatar, Dropdown, Menu } from "@arco-design/web-react";
 
 const ProfileUserButton = () => {
   const { identity } = useGetIdentity();
   const navigate = useNavigate();
   const logout = useLogout();
+  const translate = useTranslate();
 
   const droplist = (
     <Menu
@@ -16,24 +20,26 @@ const ProfileUserButton = () => {
         if (key === "logout") logout();
       }}
     >
-      <Menu.Item key="profile">Profile</Menu.Item>
-      <Menu.Item key="logout">Logout</Menu.Item>
+      <Menu.Item key="profile">{translate("menu.profile")}</Menu.Item>
+      <Menu.Item key="logout">{translate("menu.logout")}</Menu.Item>
     </Menu>
   );
 
   return (
     <Dropdown droplist={droplist} position="br" trigger="click">
-      <Button
-        startIcon={<AccountCircle />}
-        aria-label="Profile"
-        color="inherit"
-      >
-        {identity?.fullName || "Profile"}
-      </Button>
+      <Avatar size={40}>
+        <img
+          src={identity?.avatar}
+          alt={identity?.fullName || translate("menu.profile")}
+        />
+      </Avatar>
+      <span style={{ marginLeft: 8 }}>
+        {identity?.fullName || translate("menu.profile")}
+      </span>
     </Dropdown>
   );
 };
 
 export const AppBar = () => {
-  return <RAAppBar userMenu={<ProfileUserButton />} />;
+  return <RAAppBar userMenu={<ProfileUserButton />}></RAAppBar>;
 };

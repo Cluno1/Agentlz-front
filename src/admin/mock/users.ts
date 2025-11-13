@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { MockUser } from "../src/admin/data/types/user.d.ts";
+import type { MockUser } from "../data/types/user";
 
 type ListParams = {
   page?: number;

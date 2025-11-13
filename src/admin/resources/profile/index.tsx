@@ -1,23 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
-import {
-  Card,
-  Form,
-  Input,
-  Button,
-  Message,
-  Avatar,
-} from "@arco-design/web-react";
-import { useDataProvider } from "react-admin";
+import { Card, Form, Button, Avatar } from "@arco-design/web-react";
+import { useDataProvider, useTranslate } from "react-admin";
+import { useNavigate } from "react-router-dom";
 
-const ProfilePage = () => {
+const ProfileShow = () => {
   const dataProvider = useDataProvider();
+  const t = useTranslate();
   const [form] = Form.useForm();
-  const [pwdForm] = Form.useForm();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -29,43 +22,26 @@ const ProfilePage = () => {
         }
         setLoadError(null);
       } catch (e: any) {
-        setLoadError(e?.message || "获取个人资料失败");
+        setLoadError(e?.message || t("profile.messages.loadFail"));
       } finally {
         setIsLoading(false);
       }
     };
     fetchProfile();
-  }, [dataProvider, form]);
+  }, [dataProvider, form, t]);
 
-  const handleUpdateProfile = async (values: any) => {
-    try {
-      setIsUpdating(true);
-      await dataProvider.updateProfile({ data: values });
-      Message.success("资料更新成功");
-    } catch (e: any) {
-      Message.error(e?.message || "更新资料出错");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleChangePassword = async (values: any) => {
-    try {
-      setIsChangingPassword(true);
-      await dataProvider.changePassword({ data: values });
-      Message.success("密码修改成功");
-      pwdForm.resetFields();
-    } catch (e: any) {
-      Message.error(e?.message || "修改密码出错");
-    } finally {
-      setIsChangingPassword(false);
-    }
+  const goEdit = () => {
+    navigate("/profile/edit");
   };
 
   return (
-    <Card title="个人资料">
-      {isLoading && <p>加载中...</p>}
-      {loadError && <p>获取个人资料出错：{loadError}</p>}
+    <Card title={t("profile.title")}>
+      {isLoading && <p>{t("common.loading")}</p>}
+      {loadError && (
+        <p>
+          {t("profile.messages.loadError")}: {loadError}
+        </p>
+      )}
       {!isLoading && !loadError && (
         <>
           <div
@@ -76,51 +52,90 @@ const ProfilePage = () => {
               marginBottom: 16,
             }}
           >
-            <Avatar
-              size={48}
-              imageProps={{ src: form.getFieldValue("avatar") }}
-            />
+            <Avatar size={48}>
+              <img
+                src={form.getFieldValue("avatar")}
+                alt={
+                  form.getFieldValue("fullName") ||
+                  form.getFieldValue("username")
+                }
+              />
+            </Avatar>
             <span>
               {form.getFieldValue("fullName") || form.getFieldValue("username")}
             </span>
           </div>
-          <Form form={form} onSubmit={handleUpdateProfile}>
-            <Form.Item label="用户名" field="username">
-              <Input />
-            </Form.Item>
-            <Form.Item label="邮箱" field="email">
-              <Input />
-            </Form.Item>
-            <Form.Item label="头像链接" field="avatar">
-              <Input placeholder="https://avatars.githubusercontent.com/u/12345?v=4" />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={isUpdating}>
-                更新资料
-              </Button>
-            </Form.Item>
-          </Form>
-          <Form form={pwdForm} onSubmit={handleChangePassword}>
-            <Form.Item label="当前密码" field="currentPassword">
-              <Input.Password />
-            </Form.Item>
-            <Form.Item label="新密码" field="newPassword">
-              <Input.Password />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isChangingPassword}
-              >
-                修改密码
-              </Button>
-            </Form.Item>
-          </Form>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.username")}
+              </div>
+              <div>{form.getFieldValue("username") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.fullName")}
+              </div>
+              <div>{form.getFieldValue("fullName") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.email")}
+              </div>
+              <div>{form.getFieldValue("email") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.avatar")}
+              </div>
+              <div>{form.getFieldValue("avatar") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.role")}
+              </div>
+              <div>
+                {form.getFieldValue("role")
+                  ? t(`user.role.${form.getFieldValue("role")}`)
+                  : "-"}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.disabled")}
+              </div>
+              <div>
+                {form.getFieldValue("disabled")
+                  ? t("profile.disabledYes")
+                  : t("profile.disabledNo")}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.createdAt")}
+              </div>
+              <div>{form.getFieldValue("createdAt") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.createdById")}
+              </div>
+              <div>{form.getFieldValue("createdById") || "-"}</div>
+            </div>
+            <div>
+              <div style={{ color: "#666", marginBottom: 4 }}>
+                {t("profile.fields.id")}
+              </div>
+              <div>{form.getFieldValue("id") || "-"}</div>
+            </div>
+            <Button type="primary" onClick={goEdit}>
+              {t("profile.editButton")}
+            </Button>
+          </div>
         </>
       )}
     </Card>
   );
 };
 
-export default ProfilePage;
+export default ProfileShow;

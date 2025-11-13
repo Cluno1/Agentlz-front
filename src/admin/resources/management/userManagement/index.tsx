@@ -1,7 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
-import { Title } from "react-admin";
-import { Card, Table, Button, Space, Input, Message, Popconfirm, Avatar, Switch } from "@arco-design/web-react";
+import { Title, useTranslate } from "react-admin";
+import {
+  Card,
+  Table,
+  Button,
+  Space,
+  Input,
+  Message,
+  Popconfirm,
+  Avatar,
+  Switch,
+} from "@arco-design/web-react";
 import { IconPlus, IconEdit, IconDelete } from "@arco-design/web-react/icon";
 import usersApi from "../../../api/users.ts";
 import type { MockUser } from "../../../data/types/user";
@@ -17,45 +27,70 @@ export const UserManagement = () => {
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("ASC");
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const t = useTranslate();
 
   const columns = useMemo(
     () => [
       {
-        title: "头像",
+        title: t("userManagement.columns.avatar"),
         dataIndex: "avatar",
         width: 64,
-        render: (v: string) => <Avatar size={32} imageProps={{ src: v }} />,
+        render: (v: string, record: MockUser) => (
+          <Avatar size={32}>
+            <img src={v} alt={record.fullName || record.username} />
+          </Avatar>
+        ),
       },
-      { title: "ID", dataIndex: "id", sorter: true, width: 180 },
-      { title: "用户名", dataIndex: "username", sorter: true },
-      { title: "邮箱", dataIndex: "email" },
-      { title: "姓名", dataIndex: "fullName" },
-      { title: "角色", dataIndex: "role", sorter: true },
       {
-        title: "禁用登录",
+        title: t("userManagement.columns.id"),
+        dataIndex: "id",
+        sorter: true,
+        width: 180,
+      },
+      {
+        title: t("userManagement.columns.username"),
+        dataIndex: "username",
+        sorter: true,
+      },
+      { title: t("userManagement.columns.email"), dataIndex: "email" },
+      { title: t("userManagement.columns.fullName"), dataIndex: "fullName" },
+      {
+        title: t("userManagement.columns.role"),
+        dataIndex: "role",
+        sorter: true,
+        render: (v: string) => t(`user.role.${v}`) || v,
+      },
+      {
+        title: t("userManagement.columns.disabled"),
         dataIndex: "disabled",
+        sorter: true,
         render: (v: boolean, record: MockUser) => (
           <Switch
             checked={!!v}
             onChange={async (checked) => {
               try {
                 await usersApi.updateUser(record.id, { disabled: checked });
-                Message.success("状态已更新");
+                Message.success(
+                  t("userManagement.messages.updateStatusSuccess"),
+                );
                 fetchList();
               } catch (e: any) {
-                Message.error(e?.message || "更新失败");
+                Message.error(
+                  e?.message || t("userManagement.messages.updateStatusError"),
+                );
               }
             }}
           />
         ),
       },
       {
-        title: "创建时间",
+        title: t("userManagement.columns.createdAt"),
         dataIndex: "createdAt",
         render: (v: string) => (v ? new Date(v).toLocaleString() : ""),
+        sorter: true,
       },
       {
-        title: "操作",
+        title: t("userManagement.columns.operations"),
         dataIndex: "operations",
         render: (_: any, record: MockUser) => (
           <Space>
@@ -65,21 +100,22 @@ export const UserManagement = () => {
                 navigate(`/user-management/${record.id}`);
               }}
             >
-              编辑
+              {t("userManagement.columns.edit")}
             </Button>
             <Popconfirm
-              title="确认删除该用户吗？"
+              title={t("userManagement.columns.deleteConfirm")}
               onOk={() => handleDelete(record.id)}
             >
               <Button status="danger" icon={<IconDelete />}>
-                删除
+                {t("userManagement.columns.delete")}
               </Button>
             </Popconfirm>
           </Space>
         ),
       },
     ],
-    [navigate],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [navigate, t],
   );
 
   const fetchList = async () => {
@@ -95,7 +131,7 @@ export const UserManagement = () => {
       setData(res.data);
       setTotal(res.total);
     } catch (e: any) {
-      Message.error(e?.message || "获取用户列表失败");
+      Message.error(e?.message || t("userManagement.messages.listError"));
     } finally {
       setLoading(false);
     }
@@ -113,19 +149,23 @@ export const UserManagement = () => {
   const handleDelete = async (id: string) => {
     try {
       await usersApi.deleteUser(id);
-      Message.success("删除成功");
+      Message.success(t("userManagement.messages.deleteSuccess"));
       fetchList();
     } catch (e: any) {
-      Message.error(e?.message || "删除失败");
+      Message.error(e?.message || t("userManagement.messages.deleteError"));
     }
   };
 
   return (
-    <Card title={<Title title="用户管理" />} extra={null} bordered>
+    <Card
+      title={<Title title={t("userManagement.title")} />}
+      extra={null}
+      bordered
+    >
       <Space style={{ marginBottom: 16 }}>
         <Input.Search
           style={{ width: 280 }}
-          placeholder="搜索用户名/邮箱/姓名"
+          placeholder={t("userManagement.searchPlaceholder")}
           allowClear
           onSearch={(v) => {
             setPage(1);
@@ -133,7 +173,7 @@ export const UserManagement = () => {
           }}
         />
         <Button type="primary" icon={<IconPlus />} onClick={handleCreateClick}>
-          新建用户
+          {t("userManagement.createButton")}
         </Button>
       </Space>
       <Table
@@ -142,15 +182,18 @@ export const UserManagement = () => {
         columns={columns as any}
         data={data}
         pagination={{ current: page, pageSize, total, showTotal: true }}
-        onChange={(pagination, sorter) => {
+        onChange={(pagination, sorterParam) => {
           const { current = 1, pageSize: ps = 10 } = pagination || {};
           setPage(current);
           setPageSize(ps);
-          if (sorter && sorter.field) {
-            setSortField(sorter.field as keyof MockUser);
-            setSortOrder(
-              (sorter.direction || "ascend") === "ascend" ? "ASC" : "DESC",
-            );
+          const s = Array.isArray(sorterParam)
+            ? sorterParam[sorterParam.length - 1]
+            : sorterParam;
+          if (s && (s as any).field) {
+            const field = (s as any).field as keyof MockUser;
+            const dir = (s as any).direction || "ascend";
+            setSortField(field);
+            setSortOrder(dir === "ascend" ? "ASC" : "DESC");
           }
         }}
       />

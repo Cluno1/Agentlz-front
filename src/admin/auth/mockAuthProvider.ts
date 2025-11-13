@@ -13,6 +13,10 @@ const users: MockUser[] = [
     password: "123456",
     fullName: "Administrator",
     role: "admin",
+    disabled: false,
+    createdAt: new Date().toISOString(),
+    avatar: "https://avatars.githubusercontent.com/u/440935?v=4",
+    createdById: undefined,
   },
   {
     id: "2",
@@ -21,6 +25,10 @@ const users: MockUser[] = [
     password: "123456",
     fullName: "Regular User",
     role: "user",
+    disabled: false,
+    createdAt: new Date().toISOString(),
+    avatar: "https://avatars.githubusercontent.com/u/440935?v=4",
+    createdById: undefined,
   },
 ];
 

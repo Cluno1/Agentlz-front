@@ -1,10 +1,18 @@
 # Agentlz 前端开发规范
 
+### 注意⚠️
+ - 所有前端页面都必须使用 arco-design 组件库。
+ - 所有前端页面都必须使用 tailwindcss 样式。
+ - 每一个函数都要有对应的**中文**注释，注释中要包含函数的参数、返回值、异常等信息。
+ - 注意要 i18n 所有的字符串，包括页面上的文字、按钮等。
+ - 代码满足 eslint 规范。
 ## 1. 概述
 
 本文档旨在为 Agentlz 前端项目提供开发规范，包括页面设计、路由设计和文件结构。前端项目将与 Agentlz 后端服务进行交互，实现 Agent 管理、文档上传与检索等核心功能。
 
 **技术栈**：React 18, TypeScript,tailwindcss, echart, Vite, 管理框架使用 react-admin, 图表使用 echarts,组件使用 arco-design(字节跳动) 必须优先使用 arco-design组件，必要时才使用 material-ui 组件, 图标优先使用 material-ui 图标库。
+
+
 
 ## 2. 页面设计
 

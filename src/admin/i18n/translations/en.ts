@@ -13,6 +13,9 @@ export default {
     systemManagement: "System Management",
     Management: "Management",
     userManagement: "User Management",
+    agent: "Agent",
+    mcpTools: "MCP Tools",
+    create: "Create",
   },
   profile: {
     title: "Profile",
@@ -108,5 +111,53 @@ export default {
       },
       submit: "Create",
     },
+  },
+  agent: {
+    title: "Agent",
+    placeholder: "This is a placeholder content for Agent page.",
+    ui: {
+      selectAgent: "Select assistant",
+      streaming: "Generating...",
+      intermediate: "Intermediate steps",
+      placeholder: "Type message, Shift+Enter for newline",
+      send: "Send",
+      stop: "Stop",
+      newChat: "New chat",
+    },
+    msg: {
+      loadAgentsFail: "Failed to load assistants",
+      streamFail: "Streaming failed",
+    },
+  },
+  mcpTools: {
+    title: "MCP Tools",
+    placeholder: "This is a placeholder content for MCP Tools page.",
+    ui: {
+      subtitle: "Global platform listing 30,000+ MCP Servers",
+      searchPlaceholder: "Search name/tags/description",
+      categories: {
+        all: "All",
+        llm: "LLM",
+        database: "Database",
+        tools: "Tools",
+        other: "Other",
+      },
+      stats: {
+        total: "Listed",
+        today: "Added today",
+      },
+      install: "Copy install command",
+      copySuccess: "Copied",
+      copyError: "Copy failed",
+      clear: "Clear",
+      refresh: "Refresh",
+    },
+    msg: {
+      loadFail: "Load failed",
+    },
+  },
+  create: {
+    title: "Create",
+    placeholder: "This is a placeholder content for Create page.",
   },
 };

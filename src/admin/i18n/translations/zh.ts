@@ -13,6 +13,9 @@ export default {
     systemManagement: "系统管理",
     Management: "管理",
     userManagement: "用户管理",
+    agent: "智能体",
+    mcpTools: "mcp工具",
+    create: "创造",
   },
   profile: {
     title: "个人资料",
@@ -108,5 +111,53 @@ export default {
       },
       submit: "创建",
     },
+  },
+  agent: {
+    title: "智能体",
+    placeholder: "这里是智能体页面的占位内容。",
+    ui: {
+      selectAgent: "选择助手",
+      streaming: "生成中...",
+      intermediate: "中间步骤",
+      placeholder: "请输入消息，Shift+Enter 换行",
+      send: "发送",
+      stop: "停止",
+      newChat: "新对话",
+    },
+    msg: {
+      loadAgentsFail: "获取助手列表失败",
+      streamFail: "流式生成失败",
+    },
+  },
+  mcpTools: {
+    title: "mcp工具",
+    placeholder: "这里是 mcp 工具页面的占位内容。",
+    ui: {
+      subtitle: "收录 30,000+ MCP Servers 的全球平台",
+      searchPlaceholder: "搜索工具名称/标签/描述",
+      categories: {
+        all: "全部",
+        llm: "LLM",
+        database: "数据库",
+        tools: "工具",
+        other: "其他",
+      },
+      stats: {
+        total: "已收录",
+        today: "今日新增",
+      },
+      install: "复制安装命令",
+      copySuccess: "已复制",
+      copyError: "复制失败",
+      clear: "清空",
+      refresh: "刷新",
+    },
+    msg: {
+      loadFail: "加载失败",
+    },
+  },
+  create: {
+    title: "创造",
+    placeholder: "这里是创造页面的占位内容。",
   },
 };

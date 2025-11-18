@@ -16,6 +16,9 @@ import { i18nProvider } from "./i18n/i18nProvider";
 import { ConfigProvider } from "@arco-design/web-react";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
+import AgentPage from "./resources/agent/AgentPage";
+import McpToolsPage from "./resources/tools/McpToolsPage";
+import CreatePage from "./resources/create/CreatePage";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -62,13 +65,44 @@ export const App = () => (
         </ArcoLocaleBridge>
       }
     />
+    <Resource
+      name="profile"
+      list={
+        <ArcoLocaleBridge>
+          <ProfilePage />
+        </ArcoLocaleBridge>
+      }
+      edit={<ProfileEdit />}
+    />
+    <Resource
+      name="create"
+      list={
+        <ArcoLocaleBridge>
+          <CreatePage />
+        </ArcoLocaleBridge>
+      }
+    />
+    <Resource
+      name="agent"
+      list={
+        <ArcoLocaleBridge>
+          <AgentPage />
+        </ArcoLocaleBridge>
+      }
+    />
+    <Resource
+      name="mcp-tools"
+      list={
+        <ArcoLocaleBridge>
+          <McpToolsPage />
+        </ArcoLocaleBridge>
+      }
+    />
+
     {/* 公开路由：注册页（不需要认证） */}
-    <CustomRoutes noLayout>
-      <Route path="/register" element={<RegisterPage />} />
-    </CustomRoutes>
+
     <CustomRoutes>
-      <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/profile/edit" element={<ProfileEdit />} />
+      <Route path="/register" element={<RegisterPage />} />
     </CustomRoutes>
   </Admin>
 );

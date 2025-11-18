@@ -5,7 +5,7 @@ export type MockUser = {
   // 用户名/账号
   username: string;
   email?: string;
-  password: string;
+  password?: string;
   fullName?: string;
   avatar?: string;
   // 角色

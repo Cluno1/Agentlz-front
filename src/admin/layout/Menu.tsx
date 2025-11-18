@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Menu as RAMenu, usePermissions, useTranslate } from "react-admin";
-import { People, Settings, AccountCircle } from "@mui/icons-material";
+import {
+  People,
+  Settings,
+  AccountCircle,
+  SmartToy,
+  Build,
+  Create,
+} from "@mui/icons-material";
 import SubMenu from "../components/SubMenu";
 
 export const Menu = () => {
@@ -15,10 +22,21 @@ export const Menu = () => {
   return (
     <RAMenu>
       <RAMenu.DashboardItem primaryText={translate("menu.dashboard")} />
+
       <RAMenu.Item
-        to="/profile"
-        primaryText={translate("menu.profile")}
-        leftIcon={<AccountCircle />}
+        to="/agent"
+        primaryText={translate("menu.agent")}
+        leftIcon={<SmartToy />}
+      />
+      <RAMenu.Item
+        to="/mcp-tools"
+        primaryText={translate("menu.mcpTools")}
+        leftIcon={<Build />}
+      />
+      <RAMenu.Item
+        to="/create"
+        primaryText={translate("menu.create")}
+        leftIcon={<Create />}
       />
       {permissions === "admin" && (
         <SubMenu
@@ -39,6 +57,11 @@ export const Menu = () => {
           />
         </SubMenu>
       )}
+      <RAMenu.Item
+        to="/profile"
+        primaryText={translate("menu.profile")}
+        leftIcon={<AccountCircle />}
+      />
     </RAMenu>
   );
 };

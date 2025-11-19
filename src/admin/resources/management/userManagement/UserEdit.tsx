@@ -2,8 +2,16 @@
 import { useEffect, useState } from "react";
 import { useTranslate } from "react-admin";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Message, Select, Switch } from "@arco-design/web-react";
-import usersApi from "../../../api/users";
+import {
+  Card,
+  Form,
+  Input,
+  Button,
+  Message,
+  Select,
+  Switch,
+} from "@arco-design/web-react";
+import usersApi from "../../../data/api/users";
 
 const UserEdit = () => {
   const { id } = useParams();
@@ -30,7 +38,7 @@ const UserEdit = () => {
       }
     };
     load();
-  }, [id, form]);
+  }, [id, form, t]);
 
   const handleSubmit = async (values: any) => {
     try {
@@ -40,7 +48,9 @@ const UserEdit = () => {
       Message.success(t("userManagement.editPage.messages.saveSuccess"));
       navigate("/user-management");
     } catch (e: any) {
-      Message.error(e?.message || t("userManagement.editPage.messages.saveError"));
+      Message.error(
+        e?.message || t("userManagement.editPage.messages.saveError"),
+      );
     } finally {
       setSaving(false);
     }
@@ -59,25 +69,46 @@ const UserEdit = () => {
           >
             <Input />
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.email")} field="email">
+          <Form.Item
+            label={t("userManagement.editPage.fields.email")}
+            field="email"
+          >
             <Input />
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.fullName")} field="fullName">
+          <Form.Item
+            label={t("userManagement.editPage.fields.fullName")}
+            field="fullName"
+          >
             <Input />
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.role")} field="role">
+          <Form.Item
+            label={t("userManagement.editPage.fields.role")}
+            field="role"
+          >
             <Select style={{ width: "100%" }} allowClear>
-              <Select.Option value="admin">{t("user.role.admin")}</Select.Option>
+              <Select.Option value="admin">
+                {t("user.role.admin")}
+              </Select.Option>
               <Select.Option value="user">{t("user.role.user")}</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.avatar")} field="avatar">
+          <Form.Item
+            label={t("userManagement.editPage.fields.avatar")}
+            field="avatar"
+          >
             <Input placeholder="https://avatars.githubusercontent.com/u/12345?v=4" />
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.disabled")} field="disabled" triggerPropName="checked">
+          <Form.Item
+            label={t("userManagement.editPage.fields.disabled")}
+            field="disabled"
+            triggerPropName="checked"
+          >
             <Switch />
           </Form.Item>
-          <Form.Item label={t("userManagement.editPage.fields.createdAt")} field="createdAt">
+          <Form.Item
+            label={t("userManagement.editPage.fields.createdAt")}
+            field="createdAt"
+          >
             <Input disabled />
           </Form.Item>
           <Form.Item>

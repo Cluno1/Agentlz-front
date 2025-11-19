@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /*
  * 功能: 提供 MCP 工具的假数据与统计信息
  * 说明: 模拟 MCP 市场页面的数据源，包括列表与统计
@@ -117,4 +116,3 @@ export async function mockListMcpTools(params?: {
   }
   return list;
 }
-

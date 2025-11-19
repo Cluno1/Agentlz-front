@@ -4,11 +4,7 @@
  * 说明: 当前阶段仅请求前端假数据（src/admin/mock/agent.ts）
  */
 
-import {
-  mockListAgents,
-  mockSendChat,
-  mockStreamChat,
-} from "../../mock/agent";
+import { mockListAgents, mockSendChat, mockStreamChat } from "../mock/agent";
 
 /* ========================== 类型定义 ========================== */
 export type AgentInfo = {
@@ -91,4 +87,3 @@ export function streamChat(
   if (!req.agentId) throw new Error("缺少 agentId");
   return mockStreamChat(req);
 }
-

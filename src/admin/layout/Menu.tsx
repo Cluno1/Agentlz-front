@@ -42,7 +42,7 @@ export const Menu = () => {
         <SubMenu
           handleToggle={handleToggle}
           isOpen={open}
-          name={translate("menu.Management")}
+          name={"menu.Management"}
           icon={<Settings />}
         >
           <RAMenu.Item

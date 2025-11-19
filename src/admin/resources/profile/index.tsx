@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { Card, Form, Button, Avatar } from "@arco-design/web-react";
-import { useDataProvider, useTranslate } from "react-admin";
+import { useTranslate, useGetIdentity } from "react-admin";
 import { useNavigate } from "react-router-dom";
+import { getUser } from "../../data/api/user";
 
 const ProfileShow = () => {
-  const dataProvider = useDataProvider();
   const t = useTranslate();
+  const { identity } = useGetIdentity();
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -16,9 +17,18 @@ const ProfileShow = () => {
     const fetchProfile = async () => {
       try {
         setIsLoading(true);
-        const profile = await dataProvider.getProfile();
+        if (!identity?.id) {
+          setLoadError(t("profile.messages.loadFail"));
+          return;
+        }
+        const profile = await getUser(identity.id as string);
+
         if (profile) {
           form.setFieldsValue(profile);
+          localStorage.setItem(
+            import.meta.env.IDENTITY_KEY,
+            JSON.stringify(profile),
+          );
         }
         setLoadError(null);
       } catch (e: any) {
@@ -28,7 +38,7 @@ const ProfileShow = () => {
       }
     };
     fetchProfile();
-  }, [dataProvider, form, t]);
+  }, [identity?.id, form, t]);
 
   const goEdit = () => {
     navigate("/profile/edit");

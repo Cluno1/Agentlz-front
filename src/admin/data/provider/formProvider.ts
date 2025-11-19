@@ -10,11 +10,11 @@ const formProvider: DataProvider = {
     const { page = 1, perPage = 10 } = params.pagination || {};
     const { field = "id", order = "ASC" } = params.sort || {};
     const query = {
-      ...params.filter,
-      _sort: field,
-      _order: order,
-      _start: (page - 1) * perPage,
-      _end: page * perPage,
+      q: params.filter?.q,
+      sort: field,
+      order: order,
+      page: page,
+      perPage: perPage,
     };
     const url = `${apiUrl}/${resource}?${fetchUtils.queryParameters(query)}`;
     const { data: json, headers } = await httpClient.get(url);
@@ -47,8 +47,8 @@ const formProvider: DataProvider = {
     const query = {
       ...params.filter,
       [params.target]: params.id,
-      _start: (page - 1) * perPage,
-      _end: page * perPage,
+      _page: page,
+      _perPage: perPage,
     };
     const url = `${apiUrl}/${resource}?${fetchUtils.queryParameters(query)}`;
     const { data, headers } = await httpClient.get(url);
@@ -68,7 +68,7 @@ const formProvider: DataProvider = {
   /* -------------------- 更新 -------------------- */
   update: async (resource, params) => {
     const url = `${apiUrl}/${resource}/${params.id}`;
-    const { data } = await httpClient.patch(url, params.data);
+    const { data } = await httpClient.put(url, params.data);
     return { data: data.data || data };
   },
 
@@ -76,7 +76,7 @@ const formProvider: DataProvider = {
   updateMany: async (resource, params) => {
     const responses = await Promise.all(
       params.ids.map((id) =>
-        httpClient.patch(`${apiUrl}/${resource}/${id}`, params.data),
+        httpClient.put(`${apiUrl}/${resource}/${id}`, params.data),
       ),
     );
     return { data: responses.map((res) => res.data.id || res.data.data?.id) };

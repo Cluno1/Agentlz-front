@@ -1,7 +1,7 @@
 /* eslint-disable no-constant-binary-expression */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import httpClient from "../data/httpClient";
-import type { MockUser } from "../data/types/user.d.ts";
+import httpClient from "../httpClient.ts";
+import type { MockUser } from "../types/user";
 
 const useMock = import.meta.env.MODE === "development";
 
@@ -20,7 +20,7 @@ const getTenantHeaders = () => {
 
 export const listUsers = async (params: ListParams = {}) => {
   if (useMock) {
-    const mock = await import("../mock/users");
+    const mock = await import("../mock/users.ts");
     mock.seedUsers();
     return mock.listUsers(params);
   }
@@ -55,7 +55,7 @@ export const listUsers = async (params: ListParams = {}) => {
 
 export const getUser = async (id: string) => {
   if (useMock) {
-    const mock = await import("../mock/users");
+    const mock = await import("../mock/users.ts");
     return mock.getUser(id);
   }
   const res = await httpClient.get(`/v1/users/${id}`, {
@@ -66,7 +66,7 @@ export const getUser = async (id: string) => {
 
 export const createUser = async (payload: Omit<MockUser, "id">) => {
   if (useMock) {
-    const mock = await import("../mock/users");
+    const mock = await import("../mock/users.ts");
     return mock.createUser(payload);
   }
   const res = await httpClient.post("/v1/users", payload, {
@@ -77,7 +77,7 @@ export const createUser = async (payload: Omit<MockUser, "id">) => {
 
 export const updateUser = async (id: string, updates: Partial<MockUser>) => {
   if (useMock) {
-    const mock = await import("../mock/users");
+    const mock = await import("../mock/users.ts");
     return mock.updateUser(id, updates);
   }
   const res = await httpClient.put(`/v1/users/${id}`, updates, {
@@ -88,7 +88,7 @@ export const updateUser = async (id: string, updates: Partial<MockUser>) => {
 
 export const deleteUser = async (id: string) => {
   if (useMock) {
-    const mock = await import("../mock/users");
+    const mock = await import("../mock/users.ts");
     return mock.deleteUser(id);
   }
   await httpClient.delete(`/v1/users/${id}`, { headers: getTenantHeaders() });

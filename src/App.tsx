@@ -1,7 +1,7 @@
 import { Admin, CustomRoutes, Resource } from "react-admin";
 import { Route } from "react-router-dom";
 import { Layout } from "./admin/layout/Layout";
-import { authProvider } from "./admin/auth/mockAuthProvider";
+import { authProvider } from "./admin/data/provider/authProvider";
 import LoginPage from "./admin/auth/LoginPage";
 import RegisterPage from "./admin/auth/RegisterPage";
 import DashboardPage from "./admin/resources/dashboard/DashboardPage";

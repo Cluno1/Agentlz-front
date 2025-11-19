@@ -10,6 +10,9 @@ import {
   Typography,
   Link,
 } from "@arco-design/web-react";
+// 认证 API：注册接口
+import { register } from "../data/api/auth";
+import type { RegisterNameSpace } from "../data/api/auth/type";
 
 const FormItem = Form.Item;
 
@@ -18,9 +21,13 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
+  /**
+   * 提交注册表单
+   * 说明: 基础校验后调用后端 /v1/register 接口
+   */
   const handleSubmit = async (values: {
     username: string;
-    email?: string;
+    email: string;
     password: string;
     confirm: string;
   }) => {
@@ -34,11 +41,18 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      setTimeout(() => {
-        Message.success("注册成功，请登录");
-        navigate("/login");
-      }, 1000);
+      // 构建请求负载（类型安全）
+      const payload: RegisterNameSpace.RegisterParams = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+      };
+      // 调用后端注册接口
+      await register(payload);
+      Message.success("注册成功，请登录");
+      navigate("/login?username=" + values.username);
     } catch (err: any) {
+      // 错误提示（httpClient 已做统一处理，这里兜底显示 message）
       Message.warning(err?.message ?? "注册失败");
     } finally {
       setLoading(false);

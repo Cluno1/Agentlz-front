@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { Card, Form, Input, Button, Message } from "@arco-design/web-react";
-import { useDataProvider, useTranslate } from "react-admin";
+import { useTranslate, useGetIdentity } from "react-admin";
 import { useNavigate } from "react-router-dom";
+import { getUser, updateUser } from "../../data/api/user";
+import { profileProvider } from "../../data/provider/profileProvider";
 
 const ProfileEdit = () => {
-  const dataProvider = useDataProvider();
   const t = useTranslate();
+  const { identity } = useGetIdentity();
   const [form] = Form.useForm();
   const [pwdForm] = Form.useForm();
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -19,7 +21,12 @@ const ProfileEdit = () => {
     const fetchProfile = async () => {
       try {
         setIsLoading(true);
-        const profile = await dataProvider.getProfile();
+        console.log(identity, "identity ?? 零零");
+        if (!identity?.id) {
+          setLoadError(t("profile.messages.loadFail"));
+          return;
+        }
+        const profile = await getUser(identity.id);
         if (profile) {
           form.setFieldsValue(profile);
         }
@@ -31,12 +38,13 @@ const ProfileEdit = () => {
       }
     };
     fetchProfile();
-  }, [dataProvider, form, t]);
+  }, [identity?.id, form, t]);
 
   const handleUpdateProfile = async (values: any) => {
     try {
       setIsUpdating(true);
-      await dataProvider.updateProfile({ data: values });
+      if (!identity?.id) throw new Error(t("profile.messages.updateError"));
+      await updateUser(identity.id, values);
       Message.success(t("profile.messages.updateSuccess"));
       navigate("/profile");
     } catch (e: any) {
@@ -49,7 +57,7 @@ const ProfileEdit = () => {
   const handleChangePassword = async (values: any) => {
     try {
       setIsChangingPassword(true);
-      await dataProvider.changePassword({ data: values });
+      await profileProvider.changePassword({ data: values });
       Message.success(t("profile.messages.changePwdSuccess"));
       pwdForm.resetFields();
     } catch (e: any) {

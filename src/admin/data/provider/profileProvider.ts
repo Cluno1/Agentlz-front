@@ -13,7 +13,7 @@ const getTenantHeaders = () => {
 export const profileProvider = {
   getProfile: async () => {
     if (useMock) {
-      const mock = await import("../../mock/profile");
+      const mock = await import("../mock/profile");
       return await mock.getProfile();
     }
     const url = `/v1/profile`;
@@ -22,7 +22,7 @@ export const profileProvider = {
   },
   updateProfile: async (params: any) => {
     if (useMock) {
-      const mock = await import("../../mock/profile");
+      const mock = await import("../mock/profile");
       return await mock.updateProfile(params);
     }
     const url = `/v1/profile`;
@@ -33,7 +33,7 @@ export const profileProvider = {
   },
   changePassword: async (params: any) => {
     if (useMock) {
-      const mock = await import("../../mock/profile");
+      const mock = await import("../mock/profile");
       return await mock.changePassword(params);
     }
     const url = `/v1/password`;

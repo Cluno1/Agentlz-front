@@ -4,7 +4,7 @@
  * 说明: 当前阶段仅请求前端假数据（src/admin/mock/mcp.ts）
  */
 
-import { mockGetMcpStats, mockListMcpTools } from "../../mock/mcp";
+import { mockGetMcpStats, mockListMcpTools } from "../mock/mcp";
 
 /* ========================== 类型定义 ========================== */
 export type McpCategory = "llm" | "database" | "tools" | "other" | "all";
@@ -49,4 +49,3 @@ export async function listMcpTools(params?: {
   const res = await mockListMcpTools(params);
   return res;
 }
-

@@ -5,19 +5,32 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
+export type ApiResponse<T> = {
+  code: number;
+  message: string;
+  success: boolean;
+  data: T;
+};
+
 /* ========================== 1. 实例 ========================== */
 const httpClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL, // 环境变量
   timeout: 15000,
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", "X-Tenant-ID": "default" },
 });
 
 /* ========================== 2. 请求拦截 ========================== */
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem(import.meta.env.VITE_TOKEN_KEY);
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (tenantId && config.headers) {
+    config.headers["X-Tenant-ID"] = tenantId;
+  }
+
   return config;
 });
 
@@ -52,3 +65,12 @@ httpClient.interceptors.response.use(
 );
 
 export default httpClient;
+
+export async function apiPost<T>(
+  url: string,
+  data?: any,
+  config?: any,
+): Promise<ApiResponse<T>> {
+  const res = await httpClient.post<ApiResponse<T>>(url, data, config);
+  return res.data;
+}

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate } from "react-admin";
+import { Title, useTranslate, useDataProvider } from "react-admin";
 import {
   Card,
   Table,
@@ -13,7 +13,6 @@ import {
   Switch,
 } from "@arco-design/web-react";
 import { IconPlus, IconEdit, IconDelete } from "@arco-design/web-react/icon";
-import usersApi from "../../../api/users.ts";
 import type { MockUser } from "../../../data/types/user";
 import { useNavigate } from "react-router-dom";
 
@@ -28,6 +27,7 @@ export const UserManagement = () => {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const t = useTranslate();
+  const dataProvider = useDataProvider();
 
   const columns = useMemo(
     () => [
@@ -69,7 +69,10 @@ export const UserManagement = () => {
             checked={!!v}
             onChange={async (checked) => {
               try {
-                await usersApi.updateUser(record.id, { disabled: checked });
+                await dataProvider.update("users", {
+                  id: record.id,
+                  data: { disabled: checked },
+                } as any);
                 Message.success(
                   t("userManagement.messages.updateStatusSuccess"),
                 );
@@ -121,15 +124,13 @@ export const UserManagement = () => {
   const fetchList = async () => {
     try {
       setLoading(true);
-      const res = await usersApi.listUsers({
-        page,
-        perPage: pageSize,
-        sortField,
-        sortOrder,
-        filter: query ? { q: query } : undefined,
+      const { data: list, total: count } = await dataProvider.getList("users", {
+        pagination: { page, perPage: pageSize },
+        sort: { field: sortField as string, order: sortOrder },
+        filter: query ? { q: query } : {},
       });
-      setData(res.data);
-      setTotal(res.total);
+      setData(list as MockUser[]);
+      setTotal(count || 0);
     } catch (e: any) {
       Message.error(e?.message || t("userManagement.messages.listError"));
     } finally {
@@ -148,7 +149,7 @@ export const UserManagement = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await usersApi.deleteUser(id);
+      await dataProvider.delete("users", { id });
       Message.success(t("userManagement.messages.deleteSuccess"));
       fetchList();
     } catch (e: any) {

@@ -10,7 +10,7 @@ import {
   Select,
   Switch,
 } from "@arco-design/web-react";
-import usersApi from "../../../api/users";
+import usersApi from "../../../data/api/users";
 
 const UserCreate = () => {
   const [form] = Form.useForm();

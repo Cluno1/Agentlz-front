@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLogin } from "react-admin";
 import {
   Form,
@@ -10,7 +10,7 @@ import {
   Typography,
   Link,
 } from "@arco-design/web-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const FormItem = Form.Item;
 
@@ -19,6 +19,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const usernameParam = params.get("username");
+    if (usernameParam) {
+      form.setFieldsValue({ username: usernameParam });
+    }
+  }, [location.search, form]);
 
   const handleSubmit = async (values: any) => {
     setLoading(true);

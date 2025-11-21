@@ -5,6 +5,7 @@ export default {
     cancel: "Cancel",
     success: "Success",
     error: "Error",
+    reload: "Reload",
   },
   menu: {
     profile: "Profile",
@@ -22,6 +23,7 @@ export default {
     editTitle: "Edit Profile",
     editButton: "Edit Profile",
     fields: {
+      basic: "Basic",
       username: "Username",
       fullName: "Full Name",
       email: "Email",
@@ -31,6 +33,8 @@ export default {
       createdAt: "Created At",
       createdById: "Created By ID",
       id: "User ID",
+      account: "Account",
+      activity: "Activity",
     },
     disabledYes: "Yes",
     disabledNo: "No",
@@ -42,6 +46,8 @@ export default {
       pwdTitle: "Change Password",
       currentPassword: "Current Password",
       newPassword: "New Password",
+      againNewPassword: "Confirm New Password",
+      passwordNotMatch: "Passwords do not match",
       changePwdSuccess: "Password changed",
       changePwdError: "Failed to change password",
     },

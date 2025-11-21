@@ -29,7 +29,7 @@ export async function listUsers(
       order: sortOrder,
       q: (filter as any)?.q,
     } as any;
-    const res = await httpClient.get("/v1/users", {
+    const res = await httpClient.get("/users", {
       params: query,
     });
     const json = res.data;
@@ -57,10 +57,8 @@ export async function listUsers(
 export async function getUser(
   id: string,
 ): Promise<GetUserNameSpace.GetUserResult> {
-  console.log(id, "获取用户详情");
   try {
-    const res = await httpClient.get(`/v1/users/${id}`);
-    console.log(res.data, "获取用户详情2");
+    const res = await httpClient.get(`/users/${id}`);
     return (res.data?.data ?? res.data) as GetUserNameSpace.GetUserResult;
   } catch (error) {
     console.error("接口错误", error);
@@ -73,7 +71,7 @@ export async function createUser(
   payload: CreateUserNameSpace.CreateUserParams,
 ): Promise<void> {
   try {
-    await httpClient.post("/v1/users", payload);
+    await httpClient.post("/users", payload);
   } catch (error) {
     console.error("接口错误", error);
     throw error as any;
@@ -84,9 +82,10 @@ export async function createUser(
 export async function updateUser(
   id: string,
   updates: UpdateUserNameSpace.UpdateUserParams,
-): Promise<void> {
+): Promise<UpdateUserNameSpace.UpdateUserResult> {
   try {
-    await httpClient.put(`/v1/users/${id}`, updates);
+    const res = await httpClient.put(`/users/${id}`, updates);
+    return (res.data?.data ?? res.data) as UpdateUserNameSpace.UpdateUserResult;
   } catch (error) {
     console.error("接口错误", error);
     throw error as any;
@@ -96,7 +95,7 @@ export async function updateUser(
 /** @description 删除用户 */
 export async function deleteUser(id: string): Promise<void> {
   try {
-    await httpClient.delete(`/v1/users/${id}`);
+    await httpClient.delete(`/users/${id}`);
   } catch (error) {
     console.error("接口错误", error);
     throw error as any;

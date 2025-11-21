@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /*
  * 功能: MCP 数据访问层（接口定义与请求封装）
  * 说明: 当前阶段仅请求前端假数据（src/admin/mock/mcp.ts）

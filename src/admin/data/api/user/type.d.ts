@@ -29,12 +29,12 @@ export namespace ListUsersNameSpace {
     id?: string;
     username?: string;
     email?: string;
-    fullName?: string;
+    full_name?: string;
     avatar?: string;
     role?: string;
     disabled?: boolean;
-    createdAt?: string;
-    createdById?: string;
+    created_at?: string;
+    created_by_id?: string;
     [k: string]: any;
   }
 }
@@ -46,12 +46,12 @@ export namespace GetUserNameSpace {
     id?: string;
     username?: string;
     email?: string;
-    fullName?: string;
+    full_name?: string;
     avatar?: string;
     role?: string;
     disabled?: boolean;
-    createdAt?: string;
-    createdById?: string;
+    created_at?: string;
+    created_by_id?: string;
     [k: string]: any;
   }
 }
@@ -63,7 +63,7 @@ export namespace CreateUserNameSpace {
     username: string;
     email?: string;
     password?: string;
-    fullName?: string;
+    full_name?: string;
     avatar?: string;
     role?: string;
     disabled?: boolean;
@@ -78,10 +78,26 @@ export namespace UpdateUserNameSpace {
     username?: string;
     email?: string;
     password?: string;
-    fullName?: string;
+    new_password?: string;
+    current_password?: string;
+    full_name?: string;
     avatar?: string;
     role?: string;
     disabled?: boolean;
+    [k: string]: any;
+  }
+
+  /** @description 更新用户 返回结果 */
+  export interface UpdateUserResult {
+    username?: string;
+    email?: string;
+    password?: string;
+    full_name?: string;
+    avatar?: string;
+    role?: string;
+    disabled?: boolean;
+    created_at?: string;
+    created_by_id?: string;
     [k: string]: any;
   }
 }

@@ -129,6 +129,7 @@ export const UserManagement = () => {
         sort: { field: sortField as string, order: sortOrder },
         filter: query ? { q: query } : {},
       });
+      console.log(list, "list");
       setData(list as MockUser[]);
       setTotal(count || 0);
     } catch (e: any) {

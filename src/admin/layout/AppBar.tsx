@@ -24,7 +24,6 @@ const ProfileUserButton = () => {
       <Menu.Item key="logout">{translate("menu.logout")}</Menu.Item>
     </Menu>
   );
-  console.log(identity, "identity");
   return (
     <Dropdown droplist={droplist} position="br" trigger="click">
       <Avatar size={40}>

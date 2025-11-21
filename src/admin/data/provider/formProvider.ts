@@ -18,11 +18,10 @@ const formProvider: DataProvider = {
     };
     const url = `${apiUrl}/${resource}?${fetchUtils.queryParameters(query)}`;
     const { data: json, headers } = await httpClient.get(url);
-
     // 后端返回格式：{ data: T[], total: number } 或 headers['x-total-count']
     return {
-      data: json.data || json,
-      total: json.total ?? parseInt(headers["x-total-count"] || "0", 10),
+      data: json.data.data || json,
+      total: json.data.total ?? parseInt(headers["x-total-count"] || "0", 10),
     };
   },
 

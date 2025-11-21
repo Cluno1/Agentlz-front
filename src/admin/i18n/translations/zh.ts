@@ -5,6 +5,7 @@ export default {
     cancel: "取消",
     success: "操作成功",
     error: "操作失败",
+    reload: "重新加载",
   },
   menu: {
     profile: "个人资料",
@@ -22,6 +23,7 @@ export default {
     editTitle: "编辑个人资料",
     editButton: "编辑资料",
     fields: {
+      basic: "基础信息",
       username: "用户名/账号",
       fullName: "姓名",
       email: "邮箱",
@@ -31,6 +33,8 @@ export default {
       createdAt: "创建时间",
       createdById: "创建人ID",
       id: "用户ID",
+      account: "账号信息",
+      activity: "活动",
     },
     disabledYes: "是",
     disabledNo: "否",
@@ -42,6 +46,8 @@ export default {
       pwdTitle: "修改密码",
       currentPassword: "当前密码",
       newPassword: "新密码",
+      againNewPassword: "再次输入新密码",
+      passwordNotMatch: "两次输入的密码不一致",
       changePwdSuccess: "密码修改成功",
       changePwdError: "修改密码出错",
     },

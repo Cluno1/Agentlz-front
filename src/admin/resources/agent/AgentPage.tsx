@@ -29,7 +29,9 @@ const AgentPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState<string>("");
   const [streaming, setStreaming] = useState<boolean>(false);
-  const [steps, setSteps] = useState<Array<{ step: string; detail?: any }>>([]);
+  const [steps, setSteps] = useState<
+    Array<{ step: string; detail?: Record<string, unknown> }>
+  >([]);
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   const listRef = useRef<HTMLDivElement | null>(null);
 

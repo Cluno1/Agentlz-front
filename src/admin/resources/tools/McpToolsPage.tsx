@@ -40,7 +40,7 @@ const McpToolsPage: React.FC = () => {
     try {
       const s = await getMcpStats();
       setStats(s);
-    } catch (e) {
+    } catch {
       Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
     }
   };
@@ -56,7 +56,7 @@ const McpToolsPage: React.FC = () => {
     try {
       const list = await listMcpTools({ query, category });
       setTools(list);
-    } catch (e) {
+    } catch {
       Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
     } finally {
       setLoading(false);
@@ -65,7 +65,7 @@ const McpToolsPage: React.FC = () => {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   useEffect(() => {
     fetchTools();
@@ -84,7 +84,7 @@ const McpToolsPage: React.FC = () => {
     try {
       await navigator.clipboard.writeText(cmd);
       Message.success(t("mcpTools.ui.copySuccess", { _: "已复制" }));
-    } catch (e) {
+    } catch {
       Message.error(t("mcpTools.ui.copyError", { _: "复制失败" }));
     }
   };

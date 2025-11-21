@@ -14,12 +14,12 @@ export namespace RegisterNameSpace {
     id?: string;
     username?: string;
     email?: string;
-    fullName?: string;
+    full_name?: string;
     avatar?: string;
     role?: string;
     disabled?: boolean;
-    createdAt?: string;
-    createdById?: string;
+    created_at?: string;
+    created_by_id?: string;
     [k: string]: any;
   }
 }

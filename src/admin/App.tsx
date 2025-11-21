@@ -1,4 +1,10 @@
-import { Admin, CustomRoutes, Resource, useLocale } from "react-admin";
+import {
+  Admin,
+  CustomRoutes,
+  Resource,
+  useLocale,
+  defaultTheme,
+} from "react-admin";
 import { Route } from "react-router-dom";
 import { Layout } from "./layout/Layout";
 import { authProvider } from "./data/provider/authProvider";
@@ -14,6 +20,8 @@ import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
 import { i18nProvider } from "./i18n/i18nProvider";
 import { ConfigProvider } from "@arco-design/web-react";
+import { useEffect } from "react";
+import { useTheme } from "@mui/material/styles";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
 import AgentPage from "./resources/agent/AgentPage";
@@ -32,9 +40,23 @@ const BASENAME = (() => {
 
 const ArcoLocaleBridge = ({ children }: { children: React.ReactNode }) => {
   const locale = useLocale();
-  console.log(locale, "locale");
   const arcoLocale = locale === "en" ? enUS : zhCN;
+  const muiTheme = useTheme();
+  useEffect(() => {
+    const cls = "arco-theme-dark";
+    const body = document.body;
+    if (muiTheme.palette.mode === "dark") {
+      body.classList.add(cls);
+    } else {
+      body.classList.remove(cls);
+    }
+  }, [muiTheme.palette.mode]);
   return <ConfigProvider locale={arcoLocale}>{children}</ConfigProvider>;
+};
+
+const darkTheme = {
+  ...defaultTheme,
+  palette: { mode: "dark" },
 };
 
 export const App = () => (
@@ -46,6 +68,7 @@ export const App = () => (
     i18nProvider={i18nProvider}
     loginPage={LoginPage}
     dashboard={DashboardPage}
+    darkTheme={darkTheme}
   >
     <Resource
       name="user-management"

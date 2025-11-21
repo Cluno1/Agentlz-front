@@ -16,7 +16,7 @@ export type ApiResponse<T> = {
 const httpClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL, // 环境变量
   timeout: 15000,
-  headers: { "Content-Type": "application/json", "X-Tenant-ID": "default" },
+  headers: { "Content-Type": "application/json" },
 });
 
 /* ========================== 2. 请求拦截 ========================== */
@@ -47,19 +47,32 @@ httpClient.interceptors.response.use(
 
     // 统一错误提示（可换成 message.error/toast）
     switch (response.status) {
-      case 401:
-        localStorage.removeItem("access_token");
-        window.location.replace("/login"); // 强制跳转登录
-        break;
-      case 403:
-        throw new Error("Forbidden: 没有权限");
+      case 401: {
+        const err = new Error("Unauthorized");
+        (err as any).status = 401;
+        throw err;
+      }
+      case 403: {
+        const err = new Error("Forbidden: 没有权限");
+        (err as any).status = 403;
+        throw err;
+      }
       case 422:
         // 表单校验错误，react-admin 会自动解析 response.body.errors
-        throw { errors: response.data?.errors || response.data };
-      case 500:
-        throw new Error("Server error");
-      default:
-        throw new Error(response.data?.message || "Unknown error");
+        throw {
+          status: 422,
+          errors: response.data?.errors || response.data,
+        } as any;
+      case 500: {
+        const err = new Error("Server error");
+        (err as any).status = 500;
+        throw err;
+      }
+      default: {
+        const err = new Error(response.data?.message || "Unknown error");
+        (err as any).status = response.status;
+        throw err;
+      }
     }
   },
 );

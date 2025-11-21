@@ -27,7 +27,7 @@ export const authProvider: AuthProvider = {
     });
     const token = res.token || "";
     const tenantId = res.user?.tenant_id || "default";
-    if (!token) throw new Error("登录失败");
+    if (!token) return Promise.reject("登录失败");
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(TENANT_ID, tenantId);
     localStorage.setItem(
@@ -69,7 +69,6 @@ export const authProvider: AuthProvider = {
   getIdentity: async (): Promise<MockUser> => {
     try {
       const raw = localStorage.getItem(IDENTITY_KEY);
-      console.log(JSON.parse(raw || ""), "raw ?? 零零落落");
       return raw
         ? Promise.resolve(JSON.parse(raw))
         : Promise.resolve({
@@ -77,7 +76,16 @@ export const authProvider: AuthProvider = {
             username: "",
           });
     } catch {
-      return Promise.resolve({ id: "", username: "" });
+      return Promise.resolve({
+        id: "-10084",
+        username: "",
+        fullName: "",
+        disabled: false,
+        email: "",
+        role: "user",
+        createdAt: "",
+        createdById: "",
+      });
     }
   },
 };

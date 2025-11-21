@@ -111,7 +111,7 @@ export async function* mockStreamChat(
   const tokens = full.split(/(\s+)/); // 以空白分词，提升真实感
   for (let i = 0; i < tokens.length; i++) {
     // 模拟不同的 token 延迟
-    // eslint-disable-next-line no-await-in-loop
+
     await new Promise((r) => setTimeout(r, 40 + Math.random() * 120));
     yield {
       id: `${Date.now()}-${i}`,

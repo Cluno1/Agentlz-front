@@ -26,6 +26,7 @@ import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
 import AgentPage from "./resources/agent/AgentPage";
 import McpToolsPage from "./resources/tools/McpToolsPage";
+import RagPage from "./resources/rag/RagPage";
 import CreatePage from "./resources/create/CreatePage";
 
 const BASENAME = (() => {
@@ -118,6 +119,14 @@ export const App = () => (
       list={
         <ArcoLocaleBridge>
           <McpToolsPage />
+        </ArcoLocaleBridge>
+      }
+    />
+    <Resource
+      name="rag"
+      list={
+        <ArcoLocaleBridge>
+          <RagPage />
         </ArcoLocaleBridge>
       }
     />

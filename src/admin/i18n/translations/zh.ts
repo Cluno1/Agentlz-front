@@ -16,6 +16,7 @@ export default {
     userManagement: "用户管理",
     agent: "智能体",
     mcpTools: "mcp工具",
+    rag: "知识库文档",
     create: "创造",
   },
   profile: {
@@ -160,6 +161,44 @@ export default {
     },
     msg: {
       loadFail: "加载失败",
+    },
+  },
+  rag: {
+    title: "知识库文档",
+    ui: {
+      uploadTip: "支持 pdf、doc/docx、md、txt、ppt/pptx、xls/xlsx、csv 等",
+      stats: {
+        total: "总计",
+        processing: "解析中",
+        ready: "已完成",
+      },
+      tabs: {
+        upload: "上传文档",
+        docs: "查看文档",
+      },
+      columns: {
+        name: "名称",
+        size: "大小",
+        type: "类型",
+        status: "状态",
+        uploadedAt: "上传时间",
+      },
+      status: {
+        processing: "解析中",
+        ready: "已完成",
+      },
+      searchPlaceholder: "按名称搜索",
+      refresh: "刷新",
+      startUpload: "上传并解析",
+      clear: "清空",
+      categories: {
+        all: "全部",
+      },
+    },
+    msg: {
+      loadFail: "加载失败",
+      uploadSuccess: "上传成功，正在解析",
+      uploadError: "上传失败",
     },
   },
   create: {

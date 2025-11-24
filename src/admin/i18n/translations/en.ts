@@ -16,6 +16,7 @@ export default {
     userManagement: "User Management",
     agent: "Agent",
     mcpTools: "MCP Tools",
+    rag: "RAG Docs",
     create: "Create",
   },
   profile: {
@@ -160,6 +161,45 @@ export default {
     },
     msg: {
       loadFail: "Load failed",
+    },
+  },
+  rag: {
+    title: "RAG Documents",
+    ui: {
+      uploadTip:
+        "Supports pdf, doc/docx, md, txt, ppt/pptx, xls/xlsx, csv, etc.",
+      stats: {
+        total: "Total",
+        processing: "Processing",
+        ready: "Ready",
+      },
+      tabs: {
+        upload: "Upload",
+        docs: "View Documents",
+      },
+      columns: {
+        name: "Name",
+        size: "Size",
+        type: "Type",
+        status: "Status",
+        uploadedAt: "Uploaded At",
+      },
+      status: {
+        processing: "Processing",
+        ready: "Ready",
+      },
+      searchPlaceholder: "Search by name",
+      refresh: "Refresh",
+      startUpload: "Upload & Parse",
+      clear: "Clear",
+      categories: {
+        all: "All",
+      },
+    },
+    msg: {
+      loadFail: "Load failed",
+      uploadSuccess: "Uploaded, parsing",
+      uploadError: "Upload failed",
     },
   },
   create: {

@@ -7,6 +7,7 @@ import {
   SmartToy,
   Build,
   Create,
+  Description,
 } from "@mui/icons-material";
 import SubMenu from "../components/SubMenu";
 
@@ -32,6 +33,11 @@ export const Menu = () => {
         to="/mcp-tools"
         primaryText={translate("menu.mcpTools")}
         leftIcon={<Build />}
+      />
+      <RAMenu.Item
+        to="/rag"
+        primaryText={translate("menu.rag")}
+        leftIcon={<Description />}
       />
       <RAMenu.Item
         to="/create"

@@ -31,21 +31,6 @@ const McpToolsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   /*
-   * 函数: fetchStats
-   * 参数: 无
-   * 返回: Promise<void>
-   * 异常: 失败时弹出错误提示
-   */
-  const fetchStats = async (): Promise<void> => {
-    try {
-      const s = await getMcpStats();
-      setStats(s);
-    } catch {
-      Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
-    }
-  };
-
-  /*
    * 函数: fetchTools
    * 参数: 无
    * 返回: Promise<void>
@@ -63,9 +48,22 @@ const McpToolsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  /*
+   * 函数: fetchStats
+   * 参数: 无
+   * 返回: Promise<void>
+   * 异常: 失败时弹出错误提示
+   */
+  const fetchStats = async (): Promise<void> => {
+    try {
+      const s = await getMcpStats();
+      setStats(s);
+    } catch {
+      Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
+    }
+  };
+
+  fetchStats();
 
   useEffect(() => {
     fetchTools();
@@ -150,10 +148,8 @@ const McpToolsPage: React.FC = () => {
           {tools.map((tool) => (
             <Card key={tool.id} hoverable className="shadow-sm">
               <div className="flex items-start gap-3">
-                <Avatar
-                  size={32}
-                  imageProps={tool.icon ? { src: tool.icon } : undefined}
-                >
+                <Avatar size={32}>
+                  <img src={tool.icon} alt={tool.name} />
                   {!tool.icon && tool.name[0]}
                 </Avatar>
                 <div className="flex-1">

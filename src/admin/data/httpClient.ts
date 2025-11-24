@@ -48,9 +48,9 @@ httpClient.interceptors.response.use(
     // 统一错误提示（可换成 message.error/toast）
     switch (response.status) {
       case 401: {
-        const err = new Error("Unauthorized");
-        (err as any).status = 401;
-        throw err;
+        localStorage.removeItem("access_token");
+        window.location.replace("/login"); // 强制跳转登录
+        return;
       }
       case 403: {
         const err = new Error("Forbidden: 没有权限");

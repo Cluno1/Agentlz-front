@@ -129,3 +129,22 @@ export async function mockUploadRagFiles(files: File[]): Promise<RagDoc[]> {
   });
   return items;
 }
+
+export async function mockDeleteRagDoc(id: string): Promise<void> {
+  const list = readAll();
+  const next = list.filter((d) => d.id !== id);
+  writeAll(next);
+}
+
+export async function mockUpdateRagDoc(
+  id: string,
+  updates: Partial<Pick<RagDoc, "name" | "status">>,
+): Promise<RagDoc | null> {
+  const list = readAll();
+  const idx = list.findIndex((d) => d.id === id);
+  if (idx === -1) return null;
+  const updated = { ...list[idx], ...updates } as RagDoc;
+  list[idx] = updated;
+  writeAll(list);
+  return updated;
+}

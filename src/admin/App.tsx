@@ -28,6 +28,7 @@ import AgentPage from "./resources/agent/AgentPage";
 import McpToolsPage from "./resources/tools/McpToolsPage";
 import RagPage from "./resources/rag/RagPage";
 import CreatePage from "./resources/create/CreatePage";
+import RagUploadPage from "./resources/rag/RagUploadPage";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -135,6 +136,14 @@ export const App = () => (
 
     <CustomRoutes>
       <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/rag/upload"
+        element={
+          <ArcoLocaleBridge>
+            <RagUploadPage />
+          </ArcoLocaleBridge>
+        }
+      />
     </CustomRoutes>
   </Admin>
 );

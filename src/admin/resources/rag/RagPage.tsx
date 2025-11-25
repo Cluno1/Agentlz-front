@@ -1,78 +1,86 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
+import { Title, useTranslate } from "react-admin";
 import {
   Card,
-  Typography,
-  Space,
-  Tabs,
-  Upload,
   Button,
   Input,
   Message,
   Select,
   Table,
   Tag,
+  Space,
+  Popconfirm,
+  Modal,
+  Form,
 } from "@arco-design/web-react";
-import { IconUpload, IconRefresh } from "@arco-design/web-react/icon";
-import { useTranslate } from "react-admin";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
-  mockListRagDocs,
-  mockUploadRagFiles,
-  type RagDoc,
-  type RagDocStatus,
-} from "../../data/mock/rag";
-import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
+  IconUpload,
+  IconRefresh,
+  IconEdit,
+  IconDelete,
+  IconEye,
+} from "@arco-design/web-react/icon";
+import { useNavigate } from "react-router-dom";
+import {
+  listDocuments,
+  getDocument,
+  updateDocument,
+  deleteDocument,
+} from "../../data/api/rag";
+import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
 
-const STATUS_OPTIONS: Array<RagDocStatus | "all"> = [
-  "all",
-  "processing",
-  "ready",
-];
+const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
 const RagPage: React.FC = () => {
   const t = useTranslate();
-  const location = useLocation();
   const navigate = useNavigate();
-  const [active, setActive] = useState<"upload" | "docs">("upload");
-  const [fileList, setFileList] = useState<UploadItem[]>([]);
-  const [docs, setDocs] = useState<RagDoc[]>([]);
+  const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
+    [],
+  );
   const [query, setQuery] = useState<string>("");
-  const [status, setStatus] = useState<RagDocStatus | "all">("all");
+  const [status, setStatus] = useState<string | "all">("all");
   const [loading, setLoading] = useState<boolean>(false);
+  const [detailVisible, setDetailVisible] = useState<boolean>(false);
+  const [detailRecord, setDetailRecord] =
+    useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
+  const [editVisible, setEditVisible] = useState<boolean>(false);
+  const [editRecord, setEditRecord] =
+    useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState<boolean>(false);
+  const [editForm] = Form.useForm();
+  const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tab = params.get("tab");
-    if (tab === "upload" || tab === "docs") setActive(tab as any);
-  }, [location.search]);
+    fetchDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, status, scope]);
 
-  const onTabChange = (key: string) => {
-    setActive(key as any);
-    const params = new URLSearchParams(location.search);
-    params.set("tab", key);
-    navigate(
-      { pathname: "/rag", search: params.toString() },
-      { replace: true },
-    );
+  const openUploadPage = () => {
+    navigate("/rag/upload");
   };
 
   const fetchDocs = async () => {
     setLoading(true);
     try {
-      const list = await mockListRagDocs({ query, status });
-      setDocs(list);
+      const resp = await listDocuments({
+        page: 1,
+        perPage: 50,
+        sortField: "id",
+        sortOrder: "DESC",
+        filter: { q: query },
+        type: scope,
+      });
+      const rows = resp.data || [];
+      const filtered =
+        status === "all" ? rows : rows.filter((d) => d.status === status);
+      setDocs(filtered);
     } catch {
       Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchDocs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status]);
 
   const stats = useMemo(() => {
     const total = docs.length;
@@ -81,37 +89,61 @@ const RagPage: React.FC = () => {
     return { total, processing, ready };
   }, [docs]);
 
-  const handleUpload = async () => {
+  const openDetail = async (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
     try {
-      const files = fileList.map((f) => f.originFile as File).filter(Boolean);
-      if (!files.length) return;
-      await mockUploadRagFiles(files);
-      setFileList([]);
-      Message.success(t("rag.msg.uploadSuccess", { _: "上传成功，正在解析" }));
-      setActive("docs");
-      const params = new URLSearchParams(location.search);
-      params.set("tab", "docs");
-      navigate(
-        { pathname: "/rag", search: params.toString() },
-        { replace: true },
+      const full = await getDocument(String(rec.id || ""));
+      setDetailRecord(full);
+      setDetailVisible(true);
+    } catch (e: any) {
+      Message.error(e?.message || t("common.error", { _: "操作失败" }));
+    }
+  };
+
+  const openEdit = (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
+    setEditRecord(rec);
+    editForm.setFieldsValue({ title: rec.title, status: rec.status });
+    setEditVisible(true);
+  };
+
+  const submitEdit = async (values: any) => {
+    try {
+      if (!editRecord) return;
+      setEditSubmitting(true);
+      await updateDocument(String(editRecord.id || ""), {
+        title: values.title,
+        status: values.status,
+      });
+      Message.success(t("common.success", { _: "操作成功" }));
+      setEditVisible(false);
+      setEditRecord(null);
+      fetchDocs();
+    } catch (e: any) {
+      Message.error(e?.message || t("common.error", { _: "操作失败" }));
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDocument(String(id));
+      Message.success(
+        t("userManagement.messages.deleteSuccess", { _: "删除成功" }),
       );
       fetchDocs();
-    } catch {
-      Message.error(t("rag.msg.uploadError", { _: "上传失败" }));
+    } catch (e: any) {
+      Message.error(
+        e?.message ||
+          t("userManagement.messages.deleteError", { _: "删除失败" }),
+      );
     }
   };
 
   const columns = [
     {
       title: t("rag.ui.columns.name", { _: "名称" }),
-      dataIndex: "name",
-      render: (v: string) => <span className="font-medium">{v}</span>,
-    },
-    {
-      title: t("rag.ui.columns.size", { _: "大小" }),
-      dataIndex: "size",
-      render: (v: number) => `${(v / 1024).toFixed(1)} KB`,
-      width: 120,
+      dataIndex: "title",
+      render: (v: string) => <span style={{ fontWeight: 500 }}>{v}</span>,
     },
     {
       title: t("rag.ui.columns.type", { _: "类型" }),
@@ -121,7 +153,7 @@ const RagPage: React.FC = () => {
     {
       title: t("rag.ui.columns.status", { _: "状态" }),
       dataIndex: "status",
-      render: (s: RagDocStatus) => (
+      render: (s: string) => (
         <Tag color={s === "ready" ? "green" : "orangered"}>
           {s === "ready"
             ? t("rag.ui.status.ready", { _: "已完成" })
@@ -132,135 +164,189 @@ const RagPage: React.FC = () => {
     },
     {
       title: t("rag.ui.columns.uploadedAt", { _: "上传时间" }),
-      dataIndex: "uploadedAt",
-      render: (ts: number) => new Date(ts).toLocaleString(),
+      dataIndex: "upload_time",
+      render: (v: string) => (v ? new Date(v).toLocaleString() : ""),
       width: 180,
+    },
+    {
+      title: t("rag.ui.columns.operations", { _: "操作" }),
+      dataIndex: "operations",
+      render: (_: any, record: ListRagDocsNameSpace.ListRagDocsResult) => (
+        <Space>
+          <Button icon={<IconEye />} onClick={() => openDetail(record)}>
+            {t("rag.ui.columns.view", { _: "查看详情" })}
+          </Button>
+          <Button icon={<IconEdit />} onClick={() => openEdit(record)}>
+            {t("rag.ui.columns.edit", { _: "修改" })}
+          </Button>
+          <Popconfirm
+            title={t("rag.ui.columns.deleteConfirm", {
+              _: "确认删除该文档吗？",
+            })}
+            onOk={() => handleDelete(String(record.id || ""))}
+          >
+            <Button status="danger" icon={<IconDelete />}>
+              {t("rag.ui.columns.delete", { _: "删除" })}
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+      width: 280,
     },
   ];
 
   return (
-    <div className="h-full">
-      <div className="bg-gradient-to-r from-[rgb(22,93,255)] to-[rgb(0,200,255)] text-white">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <Typography.Title heading={3} style={{ color: "#fff" }}>
-                {t("rag.title")}
-              </Typography.Title>
-              <div className="text-sm opacity-90">
-                {t("rag.ui.uploadTip", {
-                  _: "支持 pdf、doc/docx、md、txt、ppt/pptx、xls/xlsx、csv 等",
-                })}
+    <div style={{ paddingTop: "30px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <Space>
+          <Button.Group>
+            <Button
+              type={scope === "self" ? "primary" : "outline"}
+              onClick={() => setScope("self")}
+            >
+              {t("rag.ui.tabs.self", { _: "个人" })}
+            </Button>
+            <Button
+              type={scope === "tenant" ? "primary" : "outline"}
+              onClick={() => setScope("tenant")}
+            >
+              {t("rag.ui.tabs.tenant", { _: "租户" })}
+            </Button>
+            <Button
+              type={scope === "system" ? "primary" : "outline"}
+              onClick={() => setScope("system")}
+            >
+              {t("rag.ui.tabs.system", { _: "系统" })}
+            </Button>
+          </Button.Group>
+        </Space>
+        <Button type="primary" icon={<IconUpload />} onClick={openUploadPage}>
+          {t("rag.ui.tabs.upload", { _: "上传文档" })}
+        </Button>
+      </div>
+      <Card title={<Title title={t("rag.title")} />} bordered>
+        <Space style={{ marginBottom: 16 }}>
+          <Input
+            allowClear
+            style={{ width: 280 }}
+            placeholder={t("rag.ui.searchPlaceholder", { _: "按名称搜索" })}
+            value={query}
+            onChange={setQuery}
+          />
+          <Select value={status} onChange={setStatus} style={{ width: 180 }}>
+            {STATUS_OPTIONS.map((s) => (
+              <Select.Option key={s} value={s}>
+                {s === "all"
+                  ? t("rag.ui.categories.all", { _: "全部" })
+                  : s === "processing"
+                    ? t("rag.ui.status.processing", { _: "解析中" })
+                    : t("rag.ui.status.ready", { _: "已完成" })}
+              </Select.Option>
+            ))}
+          </Select>
+          <Button icon={<IconRefresh />} onClick={fetchDocs}>
+            {t("rag.ui.refresh", { _: "刷新" })}
+          </Button>
+          <Space style={{ marginLeft: 12 }}>
+            <span>
+              {t("rag.ui.stats.total", { _: "总计" })}: {stats.total}
+            </span>
+            <span>
+              {t("rag.ui.stats.processing", { _: "解析中" })}:{" "}
+              {stats.processing}
+            </span>
+            <span>
+              {t("rag.ui.stats.ready", { _: "已完成" })}: {stats.ready}
+            </span>
+          </Space>
+        </Space>
+        <Table
+          loading={loading}
+          columns={columns as any}
+          data={docs}
+          rowKey="id"
+          pagination={false}
+        />
+        {!loading && docs.length === 0 && (
+          <div
+            style={{
+              textAlign: "center",
+              color: "var(--color-text-3)",
+              padding: "24px 0",
+            }}
+          >
+            {t("rag.msg.loadFail", { _: "加载失败" })}
+          </div>
+        )}
+
+        <Modal
+          title={t("rag.ui.columns.view", { _: "查看详情" })}
+          visible={detailVisible}
+          onCancel={() => setDetailVisible(false)}
+          footer={null}
+        >
+          {detailRecord && (
+            <div className="space-y-2">
+              <div>
+                {t("rag.ui.columns.name", { _: "名称" })}: {detailRecord.title}
+              </div>
+              <div>
+                {t("rag.ui.columns.type", { _: "类型" })}: {detailRecord.type}
+              </div>
+              <div>
+                {t("rag.ui.columns.status", { _: "状态" })}:{" "}
+                {detailRecord.status === "ready"
+                  ? t("rag.ui.status.ready", { _: "已完成" })
+                  : t("rag.ui.status.processing", { _: "解析中" })}
+              </div>
+              <div>
+                {t("rag.ui.columns.uploadedAt", { _: "上传时间" })}:{" "}
+                {detailRecord.upload_time
+                  ? new Date(detailRecord.upload_time).toLocaleString()
+                  : ""}
               </div>
             </div>
-            <Space size={24}>
-              <div className="text-center">
-                <div className="text-lg font-semibold">
-                  {t("rag.ui.stats.total", { _: "总计" })}
-                </div>
-                <div className="text-2xl font-bold">{stats.total}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold">
-                  {t("rag.ui.stats.processing", { _: "解析中" })}
-                </div>
-                <div className="text-2xl font-bold">{stats.processing}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold">
-                  {t("rag.ui.stats.ready", { _: "已完成" })}
-                </div>
-                <div className="text-2xl font-bold">{stats.ready}</div>
-              </div>
-            </Space>
-          </div>
-          <div className="mt-6">
-            <Tabs activeTab={active} onChange={onTabChange}>
-              <Tabs.TabPane
-                key="upload"
-                title={t("rag.ui.tabs.upload", { _: "上传文档" })}
-              >
-                <Card>
-                  <Upload
-                    drag
-                    multiple
-                    autoUpload={false}
-                    fileList={fileList}
-                    accept=".pdf,.doc,.docx,.md,.txt,.ppt,.pptx,.xls,.xlsx,.csv"
-                    onChange={(list: UploadItem[]) => setFileList(list)}
-                  />
-                  <div className="mt-4">
-                    <Space>
-                      <Button
-                        type="primary"
-                        icon={<IconUpload />}
-                        onClick={handleUpload}
-                        disabled={!fileList.length}
-                      >
-                        {t("rag.ui.startUpload", { _: "上传并解析" })}
-                      </Button>
-                      <Button
-                        icon={<IconRefresh />}
-                        onClick={() => setFileList([])}
-                        disabled={!fileList.length}
-                      >
-                        {t("rag.ui.clear", { _: "清空" })}
-                      </Button>
-                    </Space>
-                  </div>
-                </Card>
-              </Tabs.TabPane>
-              <Tabs.TabPane
-                key="docs"
-                title={t("rag.ui.tabs.docs", { _: "查看文档" })}
-              >
-                <Card>
-                  <div className="flex items-center gap-3 mb-4">
-                    <Input
-                      allowClear
-                      placeholder={t("rag.ui.searchPlaceholder", {
-                        _: "按名称搜索",
-                      })}
-                      value={query}
-                      onChange={setQuery}
-                    />
-                    <Select
-                      value={status}
-                      onChange={setStatus}
-                      style={{ width: 180 }}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <Select.Option key={s} value={s}>
-                          {s === "all"
-                            ? t("rag.ui.categories.all", { _: "全部" })
-                            : s === "processing"
-                              ? t("rag.ui.status.processing", { _: "解析中" })
-                              : t("rag.ui.status.ready", { _: "已完成" })}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                    <Button icon={<IconRefresh />} onClick={fetchDocs}>
-                      {t("rag.ui.refresh", { _: "刷新" })}
-                    </Button>
-                  </div>
-                  <Table
-                    loading={loading}
-                    columns={columns as any}
-                    data={docs}
-                    rowKey="id"
-                    pagination={false}
-                  />
-                  {!loading && docs.length === 0 && (
-                    <div className="text-center text-gray-500 py-6">
-                      {t("rag.msg.loadFail", { _: "加载失败" })}
-                    </div>
-                  )}
-                </Card>
-              </Tabs.TabPane>
-            </Tabs>
-          </div>
-        </div>
-      </div>
+          )}
+        </Modal>
+
+        <Modal
+          title={t("rag.ui.columns.edit", { _: "修改" })}
+          visible={editVisible}
+          onCancel={() => setEditVisible(false)}
+          onOk={() => editForm.submit()}
+          confirmLoading={editSubmitting}
+        >
+          <Form form={editForm} layout="vertical" onSubmit={submitEdit}>
+            <Form.Item
+              label={t("rag.ui.columns.name", { _: "名称" })}
+              field="title"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label={t("rag.ui.columns.status", { _: "状态" })}
+              field="status"
+              rules={[{ required: true }]}
+            >
+              <Select>
+                <Select.Option value="processing">
+                  {t("rag.ui.status.processing", { _: "解析中" })}
+                </Select.Option>
+                <Select.Option value="ready">
+                  {t("rag.ui.status.ready", { _: "已完成" })}
+                </Select.Option>
+              </Select>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Card>
     </div>
   );
 };

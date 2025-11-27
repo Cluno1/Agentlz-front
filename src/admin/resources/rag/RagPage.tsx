@@ -13,10 +13,12 @@ import {
   Popconfirm,
   Modal,
   Form,
+  Popover,
 } from "@arco-design/web-react";
 import {
   IconUpload,
   IconRefresh,
+  IconSearch,
   IconEdit,
   IconDelete,
   IconEye,
@@ -39,6 +41,8 @@ const RagPage: React.FC = () => {
     [],
   );
   const [query, setQuery] = useState<string>("");
+  const [tagQuery, setTagQuery] = useState<string>("");
+  const [descriptionQuery, setDescriptionQuery] = useState<string>("");
   const [status, setStatus] = useState<string | "all">("all");
   const [loading, setLoading] = useState<boolean>(false);
   const [detailVisible, setDetailVisible] = useState<boolean>(false);
@@ -50,11 +54,16 @@ const RagPage: React.FC = () => {
   const [editSubmitting, setEditSubmitting] = useState<boolean>(false);
   const [editForm] = Form.useForm();
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [total, setTotal] = useState<number>(0);
+  const [sortField, setSortField] = useState<string>("id");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
 
   useEffect(() => {
     fetchDocs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, scope]);
+  }, [status, scope, page, pageSize, sortField, sortOrder]);
 
   const openUploadPage = () => {
     navigate("/rag/upload");
@@ -64,17 +73,22 @@ const RagPage: React.FC = () => {
     setLoading(true);
     try {
       const resp = await listDocuments({
-        page: 1,
-        perPage: 50,
-        sortField: "id",
-        sortOrder: "DESC",
-        filter: { q: query },
+        page,
+        perPage: pageSize,
+        sortField,
+        sortOrder,
+        filter: {
+          q: query,
+          tags: tagQuery,
+          description: descriptionQuery,
+        },
         type: scope,
       });
       const rows = resp.data || [];
       const filtered =
         status === "all" ? rows : rows.filter((d) => d.status === status);
       setDocs(filtered);
+      setTotal(resp.total || filtered.length);
     } catch {
       Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
     } finally {
@@ -139,32 +153,139 @@ const RagPage: React.FC = () => {
     }
   };
 
+  const handlePageChange = (current: number) => {
+    setPage(current);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1); // Reset to first page when page size changes
+  };
+
+  const handleTableChange = (_pagination: any, _filters: any, sorter: any) => {
+    if (sorter.field) {
+      setSortField(sorter.field);
+      setSortOrder(sorter.order === "asc" ? "ASC" : "DESC");
+    }
+  };
+
   const columns = [
     {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "title",
+      sorter: true,
+      width: 150,
       render: (v: string) => <span style={{ fontWeight: 500 }}>{v}</span>,
     },
     {
       title: t("rag.ui.columns.type", { _: "类型" }),
       dataIndex: "type",
-      width: 140,
+      sorter: true,
+      width: 100,
     },
     {
       title: t("rag.ui.columns.status", { _: "状态" }),
       dataIndex: "status",
+      sorter: true,
       render: (s: string) => (
-        <Tag color={s === "ready" ? "green" : "orangered"}>
-          {s === "ready"
-            ? t("rag.ui.status.ready", { _: "已完成" })
-            : t("rag.ui.status.processing", { _: "解析中" })}
-        </Tag>
+        <Tag color={s === "success" ? "green" : "orangered"}>{s}</Tag>
       ),
+      width: 100,
+    },
+    {
+      title: t("rag.ui.columns.uploadedBy", { _: "上传者" }),
+      dataIndex: "uploaded_by_user_name",
+      render: (v: string, record: ListRagDocsNameSpace.ListRagDocsResult) => (
+        <Space>
+          {record.uploaded_by_user_avatar && (
+            <Popover
+              content={
+                <div style={{ padding: "8px" }}>
+                  <div style={{ marginBottom: "8px" }}>
+                    <img
+                      src={record.uploaded_by_user_avatar}
+                      alt="avatar"
+                      style={{ width: 48, height: 48, borderRadius: "50%" }}
+                    />
+                  </div>
+                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+                    {v || record.uploaded_by_user_username}
+                  </div>
+                  <div
+                    style={{ color: "var(--color-text-2)", fontSize: "12px" }}
+                  >
+                    {record.uploaded_by_user_username}
+                  </div>
+                  {record.uploaded_by_user_email && (
+                    <div
+                      style={{
+                        color: "var(--color-text-2)",
+                        fontSize: "12px",
+                        marginTop: "4px",
+                      }}
+                    >
+                      {record.uploaded_by_user_email}
+                    </div>
+                  )}
+                </div>
+              }
+              trigger="hover"
+              position="top"
+            >
+              {record.uploaded_by_user_avatar ? (
+                <img
+                  src={record.uploaded_by_user_avatar}
+                  alt="avatar"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    cursor: "pointer",
+                  }}
+                />
+              ) : (
+                <span>{v || record.uploaded_by_user_username}</span>
+              )}
+            </Popover>
+          )}
+        </Space>
+      ),
+      width: 80,
+    },
+    {
+      title: t("rag.ui.columns.tenant", { _: "租户" }),
+      dataIndex: "tenant_name",
       width: 120,
+    },
+    {
+      title: t("rag.ui.columns.tags", { _: "标签" }),
+      dataIndex: "tags",
+      sorter: true,
+      render: (v: string | string[]) => {
+        if (!v) return null;
+        const tags = typeof v === "string" ? v.split(",") : v;
+        return (
+          <Space wrap>
+            {tags.map((tag, index) => (
+              <Tag key={index} size="small">
+                {tag.trim()}
+              </Tag>
+            ))}
+          </Space>
+        );
+      },
+      width: 200,
+    },
+    {
+      title: t("rag.ui.columns.description", { _: "描述" }),
+      dataIndex: "description",
+      render: (v: string) => v || "-",
+      width: 200,
     },
     {
       title: t("rag.ui.columns.uploadedAt", { _: "上传时间" }),
       dataIndex: "upload_time",
+      sorter: true,
       render: (v: string) => (v ? new Date(v).toLocaleString() : ""),
       width: 180,
     },
@@ -191,7 +312,7 @@ const RagPage: React.FC = () => {
           </Popconfirm>
         </Space>
       ),
-      width: 280,
+      width: 180,
     },
   ];
 
@@ -238,6 +359,25 @@ const RagPage: React.FC = () => {
             placeholder={t("rag.ui.searchPlaceholder", { _: "按名称搜索" })}
             value={query}
             onChange={setQuery}
+            onPressEnter={fetchDocs}
+          />
+          <Input
+            allowClear
+            style={{ width: 200 }}
+            placeholder={t("rag.ui.searchTagPlaceholder", { _: "按标签搜索" })}
+            value={tagQuery}
+            onChange={setTagQuery}
+            onPressEnter={fetchDocs}
+          />
+          <Input
+            allowClear
+            style={{ width: 200 }}
+            placeholder={t("rag.ui.searchDescriptionPlaceholder", {
+              _: "按描述搜索",
+            })}
+            value={descriptionQuery}
+            onChange={setDescriptionQuery}
+            onPressEnter={fetchDocs}
           />
           <Select value={status} onChange={setStatus} style={{ width: 180 }}>
             {STATUS_OPTIONS.map((s) => (
@@ -250,6 +390,9 @@ const RagPage: React.FC = () => {
               </Select.Option>
             ))}
           </Select>
+          <Button type="primary" icon={<IconSearch />} onClick={fetchDocs}>
+            {t("rag.ui.search", { _: "搜索" })}
+          </Button>
           <Button icon={<IconRefresh />} onClick={fetchDocs}>
             {t("rag.ui.refresh", { _: "刷新" })}
           </Button>
@@ -271,7 +414,15 @@ const RagPage: React.FC = () => {
           columns={columns as any}
           data={docs}
           rowKey="id"
-          pagination={false}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showTotal: true,
+            onChange: handlePageChange,
+            onPageSizeChange: handlePageSizeChange,
+          }}
+          onChange={handleTableChange}
         />
         {!loading && docs.length === 0 && (
           <div
@@ -304,6 +455,22 @@ const RagPage: React.FC = () => {
                 {detailRecord.status === "ready"
                   ? t("rag.ui.status.ready", { _: "已完成" })
                   : t("rag.ui.status.processing", { _: "解析中" })}
+              </div>
+              <div>
+                {t("rag.ui.columns.tenant", { _: "租户" })}:{" "}
+                {detailRecord.tenant_name}
+              </div>
+              <div>
+                {t("rag.ui.columns.uploadedBy", { _: "上传者" })}:{" "}
+                {detailRecord.uploaded_by_user_name} ({" "}
+                {detailRecord.uploaded_by_user_username})
+              </div>
+              <div>
+                {t("rag.ui.columns.tags", { _: "标签" })}: {detailRecord.tags}
+              </div>
+              <div>
+                {t("rag.ui.columns.description", { _: "描述" })}:{" "}
+                {detailRecord.description || "-"}
               </div>
               <div>
                 {t("rag.ui.columns.uploadedAt", { _: "上传时间" })}:{" "}

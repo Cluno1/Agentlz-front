@@ -29,16 +29,21 @@ export namespace ListRagDocsNameSpace {
   export interface ListRagDocsResult {
     id?: string;
     tenant_id?: string;
-    uploaded_by_user_id?: string;
+    uploaded_by_user_id?: number;
     status?: string;
     upload_time?: string;
     title?: string;
     content?: string;
     type?: string;
     tags?: string | string[];
-    description?: string;
+    description?: string | null;
     meta_https?: any;
     save_https?: any;
+    tenant_name?: string;
+    uploaded_by_user_name?: string;
+    uploaded_by_user_username?: string;
+    uploaded_by_user_avatar?: string;
+    uploaded_by_user_email?: string;
     [k: string]: any;
   }
 }

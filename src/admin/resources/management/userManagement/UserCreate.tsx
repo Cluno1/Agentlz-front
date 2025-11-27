@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
-import { useTranslate } from "react-admin";
+import { useTranslate, useDataProvider } from "react-admin";
 import {
   Card,
   Form,
@@ -10,17 +10,29 @@ import {
   Select,
   Switch,
 } from "@arco-design/web-react";
-import usersApi from "../../../data/api/users";
 
 const UserCreate = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const t = useTranslate();
+  const dataProvider = useDataProvider();
 
   const handleSubmit = async (values: any) => {
     try {
       setSubmitting(true);
-      await usersApi.createUser(values);
+      // Map form values to match backend API requirements
+      const payload = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+        full_name: values.fullName, // Map to snake_case for backend
+        avatar: values.avatar,
+        role: values.role || "user",
+        disabled: values.disabled || false,
+        created_by_id: null, // You can modify this if you want to track who created the user
+      };
+
+      await dataProvider.create("users", { data: payload });
       Message.success(t("userManagement.createPage.messages.createSuccess"));
       window.history.back();
     } catch (e: any) {

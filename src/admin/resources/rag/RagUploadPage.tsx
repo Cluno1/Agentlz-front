@@ -1,50 +1,66 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import { Title, useTranslate } from "react-admin";
-import { Card, Upload, Button, Message, Space } from "@arco-design/web-react";
+import {
+  Card,
+  Upload,
+  Button,
+  Message,
+  Space,
+  Input,
+  Select,
+} from "@arco-design/web-react";
 import { IconUpload, IconRefresh } from "@arco-design/web-react/icon";
 import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
 import { useNavigate } from "react-router-dom";
 import { createDocument } from "../../data/api/rag";
-import type { CreateRagDocNameSpace } from "../../data/api/rag/type";
 
 const RagUploadPage: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
   const [fileList, setFileList] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [tags, setTags] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [docType, setDocType] = useState<string>("self");
+  const [fileName, setFileName] = useState<string>("");
 
-  const toBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
+  const toArrayBuffer = (file: File) =>
+    new Promise<ArrayBuffer>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const res = reader.result as string;
-        resolve(res);
-      };
-      reader.onerror = (e) => reject(e);
-      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
     });
 
   const inferDocType = (file: File) => {
     const ext = (file.name.split(".").pop() || "").toLowerCase();
     return ext || file.type || "txt";
   };
-
   const handleUpload = async () => {
     try {
       setUploading(true);
-      const files = fileList.map((f) => f.originFile as File).filter(Boolean);
-      if (!files.length) return;
-      for (const f of files) {
-        const content = await toBase64(f);
-        const payload: CreateRagDocNameSpace.CreateRagDocParams = {
-          document: content,
-          document_type: inferDocType(f),
-          title: f.name,
-        };
-        await createDocument(payload, "self");
+      const file = fileList[0]?.originFile as File;
+      if (!file) return;
+
+      const arrayBuffer = await toArrayBuffer(file);
+      const blob = new Blob([arrayBuffer], { type: file.type });
+
+      const formData = new FormData();
+      formData.append("document", blob, file.name);
+      formData.append("document_type", inferDocType(file));
+      formData.append("title", fileName || file.name);
+      formData.append("type", docType);
+      if (description) formData.append("description", description);
+      if (tags) {
+        const tagArray = tags.split(/[,\s]+/).filter(Boolean);
+        if (tagArray.length) {
+          formData.append("tags", JSON.stringify(tagArray));
+        }
       }
-      setFileList([]);
+
+      await createDocument(formData);
+
       Message.success(t("rag.msg.uploadSuccess", { _: "上传成功，正在解析" }));
       navigate("/rag");
     } catch (e: any) {
@@ -61,12 +77,99 @@ const RagUploadPage: React.FC = () => {
     >
       <Upload
         drag
-        multiple
         autoUpload={false}
         fileList={fileList}
         accept=".pdf,.doc,.docx,.md,.txt,.ppt,.pptx,.xls,.xlsx,.csv"
-        onChange={(list: UploadItem[]) => setFileList(list)}
+        onChange={(list: UploadItem[]) => {
+          setFileList(list);
+          if (list.length > 0 && list[0].originFile) {
+            setFileName(list[0].originFile.name);
+          } else {
+            setFileName("");
+          }
+        }}
       />
+
+      <div style={{ marginTop: 24 }}>
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{ display: "block", marginBottom: 8, fontWeight: "bold" }}
+          >
+            {t("rag.ui.fileName", { _: "文件名称" })}
+          </label>
+          <Input
+            value={fileName}
+            onChange={setFileName}
+            placeholder={t("rag.ui.fileNamePlaceholder", {
+              _: "请输入文件名称",
+            })}
+            style={{ width: "100%" }}
+            disabled={!fileList.length}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{ display: "block", marginBottom: 8, fontWeight: "bold" }}
+          >
+            {t("rag.ui.documentType", { _: "文档类型" })}
+          </label>
+          <Select
+            value={docType}
+            onChange={setDocType}
+            style={{ width: 200 }}
+            options={[
+              {
+                label: t("rag.ui.type.self", { _: "个人文档" }),
+                value: "self",
+              },
+              {
+                label: t("rag.ui.type.tenant", { _: "租户文档" }),
+                value: "tenant",
+              },
+              {
+                label: t("rag.ui.type.system", { _: "系统文档" }),
+                value: "system",
+              },
+            ]}
+            disabled={!fileList.length}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{ display: "block", marginBottom: 8, fontWeight: "bold" }}
+          >
+            {t("rag.ui.tags", { _: "标签" })}
+          </label>
+          <Input
+            value={tags}
+            onChange={setTags}
+            placeholder={t("rag.ui.tagsPlaceholder", {
+              _: "请输入标签，用空格分隔",
+            })}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{ display: "block", marginBottom: 8, fontWeight: "bold" }}
+          >
+            {t("rag.ui.description", { _: "描述" })}
+          </label>
+          <Input.TextArea
+            value={description}
+            onChange={setDescription}
+            placeholder={t("rag.ui.descriptionPlaceholder", {
+              _: "请输入文档描述（可选）",
+            })}
+            rows={3}
+            style={{ width: "100%" }}
+          />
+        </div>
+      </div>
+
       <Space style={{ marginTop: 16 }}>
         <Button
           type="primary"
@@ -79,7 +182,13 @@ const RagUploadPage: React.FC = () => {
         </Button>
         <Button
           icon={<IconRefresh />}
-          onClick={() => setFileList([])}
+          onClick={() => {
+            setFileList([]);
+            setFileName("");
+            setTags("");
+            setDescription("");
+            setDocType("self");
+          }}
           disabled={!fileList.length}
         >
           {t("rag.ui.clear", { _: "清空" })}

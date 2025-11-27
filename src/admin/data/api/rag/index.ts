@@ -124,13 +124,16 @@ export async function downloadDocument(
  * 异常：类型不支持/认证错误抛出 Error
  */
 export async function createDocument(
-  payload: CreateRagDocNameSpace.CreateRagDocParams,
-  type?: "system" | "self" | "tenant",
+  payload: CreateRagDocNameSpace.CreateRagDocParams | FormData,
 ): Promise<CreateRagDocNameSpace.CreateRagDocResult> {
   try {
-    const res = await httpClient.post("/rag", payload, {
-      params: type ? { type } : undefined,
-    });
+    // 如果是 FormData，需要设置正确的 Content-Type
+    const config =
+      payload instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+
+    const res = await httpClient.post("/rag", payload, config);
     return (res.data?.data ??
       res.data) as CreateRagDocNameSpace.CreateRagDocResult;
   } catch (error) {

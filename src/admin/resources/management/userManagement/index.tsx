@@ -53,7 +53,7 @@ export const UserManagement = () => {
         sorter: true,
       },
       { title: t("userManagement.columns.email"), dataIndex: "email" },
-      { title: t("userManagement.columns.fullName"), dataIndex: "fullName" },
+      { title: t("userManagement.columns.fullName"), dataIndex: "full_name" },
       {
         title: t("userManagement.columns.role"),
         dataIndex: "role",

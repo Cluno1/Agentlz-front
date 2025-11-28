@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate } from "react-admin";
+import { Title, useTranslate, useCreatePath } from "react-admin";
 import {
   Card,
   Button,
@@ -14,6 +14,7 @@ import {
   Modal,
   Form,
   Popover,
+  Switch,
 } from "@arco-design/web-react";
 import {
   IconUpload,
@@ -26,17 +27,19 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   listDocuments,
-  getDocument,
   updateDocument,
   deleteDocument,
 } from "../../data/api/rag";
 import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
+import { useDarkMode } from "../../data/hook/useDark";
 
 const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
 const RagPage: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
+  const createPath = useCreatePath();
+  const { cardColorStyle } = useDarkMode();
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
     [],
   );
@@ -46,7 +49,7 @@ const RagPage: React.FC = () => {
   const [status, setStatus] = useState<string | "all">("all");
   const [loading, setLoading] = useState<boolean>(false);
   const [detailVisible, setDetailVisible] = useState<boolean>(false);
-  const [detailRecord, setDetailRecord] =
+  const [detailRecord] =
     useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
   const [editVisible, setEditVisible] = useState<boolean>(false);
   const [editRecord, setEditRecord] =
@@ -105,9 +108,8 @@ const RagPage: React.FC = () => {
 
   const openDetail = async (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
     try {
-      const full = await getDocument(String(rec.id || ""));
-      setDetailRecord(full);
-      setDetailVisible(true);
+      const to = createPath({ resource: "rag", type: "show", id: rec.id });
+      navigate(to);
     } catch (e: any) {
       Message.error(e?.message || t("common.error", { _: "操作失败" }));
     }
@@ -115,7 +117,14 @@ const RagPage: React.FC = () => {
 
   const openEdit = (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
     setEditRecord(rec);
-    editForm.setFieldsValue({ title: rec.title, status: rec.status });
+    const tagsStr = Array.isArray(rec.tags)
+      ? (rec.tags as string[]).join(",")
+      : (rec.tags as string) || "";
+    editForm.setFieldsValue({
+      tags: tagsStr,
+      description: rec.description || "",
+      disabled: Boolean((rec as any).disabled),
+    });
     setEditVisible(true);
   };
 
@@ -123,9 +132,17 @@ const RagPage: React.FC = () => {
     try {
       if (!editRecord) return;
       setEditSubmitting(true);
+      const tagsInput = values.tags;
+      const tagsArray = Array.isArray(tagsInput)
+        ? tagsInput
+        : String(tagsInput || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
       await updateDocument(String(editRecord.id || ""), {
-        title: values.title,
-        status: values.status,
+        tags: tagsArray.length ? tagsArray : undefined,
+        description: values.description ?? undefined,
+        disabled: values.disabled ?? undefined,
       });
       Message.success(t("common.success", { _: "操作成功" }));
       setEditVisible(false);
@@ -188,7 +205,7 @@ const RagPage: React.FC = () => {
       dataIndex: "status",
       sorter: true,
       render: (s: string) => (
-        <Tag color={s === "success" ? "green" : "orangered"}>{s}</Tag>
+        <Tag color={s === "ready" ? "green" : "orangered"}>{s}</Tag>
       ),
       width: 100,
     },
@@ -351,7 +368,11 @@ const RagPage: React.FC = () => {
           {t("rag.ui.tabs.upload", { _: "上传文档" })}
         </Button>
       </div>
-      <Card title={<Title title={t("rag.title")} />} bordered>
+      <Card
+        title={<Title title={t("rag.title")} />}
+        bordered
+        style={{ ...cardColorStyle }}
+      >
         <Space style={{ marginBottom: 16 }}>
           <Input
             allowClear
@@ -428,7 +449,6 @@ const RagPage: React.FC = () => {
           <div
             style={{
               textAlign: "center",
-              color: "var(--color-text-3)",
               padding: "24px 0",
             }}
           >
@@ -491,25 +511,27 @@ const RagPage: React.FC = () => {
         >
           <Form form={editForm} layout="vertical" onSubmit={submitEdit}>
             <Form.Item
-              label={t("rag.ui.columns.name", { _: "名称" })}
-              field="title"
-              rules={[{ required: true }]}
+              label={t("rag.ui.columns.tags", { _: "标签" })}
+              field="tags"
             >
-              <Input />
+              <Input
+                placeholder={t("rag.ui.searchTagPlaceholder", {
+                  _: "按标签搜索",
+                })}
+              />
             </Form.Item>
             <Form.Item
-              label={t("rag.ui.columns.status", { _: "状态" })}
-              field="status"
-              rules={[{ required: true }]}
+              label={t("rag.ui.columns.description", { _: "描述" })}
+              field="description"
             >
-              <Select>
-                <Select.Option value="processing">
-                  {t("rag.ui.status.processing", { _: "解析中" })}
-                </Select.Option>
-                <Select.Option value="ready">
-                  {t("rag.ui.status.ready", { _: "已完成" })}
-                </Select.Option>
-              </Select>
+              <Input.TextArea rows={4} />
+            </Form.Item>
+            <Form.Item
+              label={t("rag.ui.columns.disabled", { _: "停用" })}
+              field="disabled"
+              triggerPropName="checked"
+            >
+              <Switch />
             </Form.Item>
           </Form>
         </Modal>

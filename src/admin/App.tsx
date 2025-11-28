@@ -29,6 +29,7 @@ import McpToolsPage from "./resources/tools/McpToolsPage";
 import RagPage from "./resources/rag/RagPage";
 import CreatePage from "./resources/create/CreatePage";
 import RagUploadPage from "./resources/rag/RagUploadPage";
+import RagShow from "./resources/rag/RagShow";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -45,12 +46,18 @@ const ArcoLocaleBridge = ({ children }: { children: React.ReactNode }) => {
   const arcoLocale = locale === "en" ? enUS : zhCN;
   const muiTheme = useTheme();
   useEffect(() => {
-    const cls = "arco-theme-dark";
     const body = document.body;
-    if (muiTheme.palette.mode === "dark") {
-      body.classList.add(cls);
+    const isDark = muiTheme.palette.mode === "dark";
+    if (isDark) {
+      body.setAttribute("arco-theme", "dark");
+      body.style.setProperty("background-color", "var(--color-bg-1)");
+      body.style.setProperty("color", "var(--color-text-1)");
+      body.style.setProperty("color-scheme", "dark");
     } else {
-      body.classList.remove(cls);
+      body.removeAttribute("arco-theme");
+      body.style.removeProperty("background-color");
+      body.style.removeProperty("color");
+      body.style.setProperty("color-scheme", "light");
     }
   }, [muiTheme.palette.mode]);
   return <ConfigProvider locale={arcoLocale}>{children}</ConfigProvider>;
@@ -128,6 +135,11 @@ export const App = () => (
       list={
         <ArcoLocaleBridge>
           <RagPage />
+        </ArcoLocaleBridge>
+      }
+      show={
+        <ArcoLocaleBridge>
+          <RagShow />
         </ArcoLocaleBridge>
       }
     />

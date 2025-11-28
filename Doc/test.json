@@ -1,0 +1,19 @@
+"data": {
+        "id": "fe954e608ba04e078788d1fe08df91a3",
+        "tenant_id": "default",
+        "uploaded_by_user_id": 131143,
+        "status": "success",
+        "upload_time": "2025-11-28 01:27:47",
+        "title": "2025计算机学院毕业实习管理规定（发给学生）.docx",
+        "content": "**广东工业大学计算机学院毕业实习管理规定**\n\n..",
+        "type": "docx",
+        "tags": "",
+        "description": "",
+        "meta_https": "",
+        "save_https": "http://localhost:8000/v1/cos/document/default/94e802f5b88348ce_2025计算机学院毕业实习管理规定（发给学生）.docx",
+        "tenant_name": "default",
+        "uploaded_by_user_name": "张连登",
+        "uploaded_by_user_username": "llm",
+        "uploaded_by_user_avatar": "https://agentlz-1328751369.cos.ap-guangzhou.myqcloud.com/avatar/avatar-download.jpg",
+        "uploaded_by_user_email": "11m@qq.com"
+    }

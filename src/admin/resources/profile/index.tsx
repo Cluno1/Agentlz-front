@@ -118,12 +118,28 @@ const ProfileShow = () => {
                       form.getFieldValue("username") ||
                       "-"}
                   </Typography.Title>
-                  <div className="flex items-center gap-2">
-                    {form.getFieldValue("role") && (
-                      <Tag color="blue">
-                        {t(`user.role.${form.getFieldValue("role")}`)}
-                      </Tag>
-                    )}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "row",
+                      gap: "8px", // Tailwind 的 gap-2 对应 8px
+                      minWidth: "200px",
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {form.getFieldValue("role") && (
+                        <Tag color="blue">
+                          {t(`user.role.${form.getFieldValue("role")}`)}
+                        </Tag>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {form.getFieldValue("tenant_id") && (
+                        <Tag color="blue">
+                          {form.getFieldValue("tenant_id")}
+                        </Tag>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -292,6 +308,25 @@ const ProfileShow = () => {
                   }}
                 >
                   {form.getFieldValue("created_by_id") || "-"}
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    marginBottom: 2,
+                    color: textColor,
+                  }}
+                >
+                  {t("profile.fields.tenant")}
+                </div>
+                <div
+                  style={{
+                    marginBottom: 6,
+                    fontWeight: "bold",
+                    color: textColor,
+                  }}
+                >
+                  {form.getFieldValue("tenant_id") || "-"}
                 </div>
               </div>
               <div>

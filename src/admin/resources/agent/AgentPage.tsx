@@ -12,7 +12,7 @@ import {
   Tag,
   Typography,
 } from "@arco-design/web-react";
-import { IconRobot, IconUser } from "@arco-design/web-react/icon";
+import { IconUser } from "@arco-design/web-react/icon";
 import { useTranslate } from "react-admin";
 import {
   listAgents,
@@ -21,19 +21,24 @@ import {
   type AgentInfo,
   type ChatMessage,
 } from "../../data/agent";
+import { useDarkMode } from "../../data/hook/useDark";
 
 const AgentPage: React.FC = () => {
   const t = useTranslate();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [agentId, setAgentId] = useState<string>("");
+  // 记录当前的消息
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState<string>("");
+  // 记录当前是否正在流式传输
   const [streaming, setStreaming] = useState<boolean>(false);
+  // 记录当前的步骤
   const [steps, setSteps] = useState<
     Array<{ step: string; detail?: Record<string, unknown> }>
   >([]);
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   const listRef = useRef<HTMLDivElement | null>(null);
+  const { isDark } = useDarkMode();
 
   useEffect(() => {
     listAgents()
@@ -60,6 +65,7 @@ const AgentPage: React.FC = () => {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || !agentId || streaming) return;
+    // 清空当前的步骤
     setSteps([]);
     streamAbortRef.current.aborted = false;
     const userMsg: ChatMessage = {
@@ -83,7 +89,7 @@ const AgentPage: React.FC = () => {
     try {
       const req = {
         agentId,
-        messages: messages.concat({ role: "user", content: text }),
+        messages: text,
       };
       const gen = streamChat(req);
       for await (const chunk of gen) {
@@ -130,24 +136,56 @@ const AgentPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full p-6">
-      <div className="mx-auto max-w-4xl space-y-4">
-        <div className="flex items-center justify-between">
-          <Typography.Title heading={4}>{t("agent.title")}</Typography.Title>
+    <div
+      style={{
+        minHeight: "100%",
+        padding: 24,
+        position: "relative",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          margin: "0 auto",
+          maxWidth: 1024,
+          display: "flex",
+          flexDirection: "column",
+          rowGap: 16,
+          paddingBottom: 160,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Button onClick={() => setMessages([])}>新对话 +</Button>
           <Space>
             <Select
               value={agentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
               onChange={setAgentId}
-              className="w-48"
+              style={{ width: 192 }}
             >
               {agents.map((a) => (
                 <Select.Option key={a.id} value={a.id}>
-                  <div className="flex items-center gap-2">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
                     {a.avatar ? (
-                      <Avatar size={20} imageProps={{ src: a.avatar }} />
+                      <Avatar size={20}>
+                        <img src={a.avatar} alt={a.name} />
+                      </Avatar>
                     ) : (
-                      <IconRobot />
+                      <Avatar size={20}>
+                        <img src="/agentlz-robot.jpg" alt={a.name} />
+                      </Avatar>
                     )}
                     <span>{a.name}</span>
                   </div>
@@ -158,22 +196,24 @@ const AgentPage: React.FC = () => {
         </div>
 
         {currentAgent && (
-          <Card className="shadow-sm">
-            <div className="flex items-center gap-2">
+          <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {currentAgent.avatar ? (
                 <Avatar size={28}>
                   <img src={currentAgent.avatar} alt={currentAgent.name} />
                 </Avatar>
               ) : (
-                <IconRobot />
+                <Avatar size={28}>
+                  <img src="/agentlz-robot.jpg" alt={currentAgent.name} />
+                </Avatar>
               )}
-              <div className="flex-1">
-                <div className="font-medium">{currentAgent.name}</div>
-                <div className="text-xs text-gray-500">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500 }}>{currentAgent.name}</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
                   {currentAgent.description}
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div style={{ display: "flex", gap: 4 }}>
                 {(currentAgent.tags || []).map((tag) => (
                   <Tag key={tag} size="small" color="arcoblue">
                     {tag}
@@ -184,30 +224,67 @@ const AgentPage: React.FC = () => {
           </Card>
         )}
 
-        <Card className="shadow-sm">
+        <Card
+          style={{
+            boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+          }}
+        >
           <div
             ref={listRef}
-            className="max-h-[54vh] overflow-y-auto pr-1 space-y-4"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              paddingRight: 4,
+              display: "flex",
+              flexDirection: "column",
+              rowGap: 16,
+            }}
           >
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                style={{
+                  display: "flex",
+                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                }}
               >
                 <div
-                  className={`flex max-w-[80%] items-start gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}
+                  style={{
+                    display: "flex",
+                    maxWidth: "80%",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    flexDirection: m.role === "user" ? "row-reverse" : "row",
+                  }}
                 >
-                  <Avatar
-                    size={28}
-                    style={{
-                      backgroundColor:
-                        m.role === "user" ? "#165DFF" : "#F2F3F5",
-                    }}
-                  >
-                    {m.role === "user" ? <IconUser /> : <IconRobot />}
-                  </Avatar>
+                  {m.role === "user" ? (
+                    <Avatar size={28} style={{ backgroundColor: "#165DFF" }}>
+                      <IconUser />
+                    </Avatar>
+                  ) : (
+                    <Avatar size={28}>
+                      <img
+                        src="/agentlz-robot.jpg"
+                        alt={currentAgent?.name || ""}
+                      />
+                    </Avatar>
+                  )}
                   <div
-                    className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === "user" ? "bg-[rgb(22,93,255)] text-white" : "bg-[rgb(247,248,250)]"}`}
+                    style={{
+                      borderRadius: 16,
+                      borderColor: m.role === "user" ? "" : "red",
+                      borderWidth: "10px",
+                      padding: "8px 12px",
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      backgroundColor:
+                        m.role === "user" ? "rgb(22,93,255)" : "",
+                      color: m.role === "user" ? "#fff" : "",
+                    }}
                   >
                     {m.content}
                   </div>
@@ -215,20 +292,46 @@ const AgentPage: React.FC = () => {
               </div>
             ))}
             {streaming && (
-              <div className="flex items-center gap-2 text-gray-500">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: "#6b7280",
+                }}
+              >
                 <Spin size={16} />
                 <span>{t("agent.ui.streaming", { _: "生成中" })}</span>
               </div>
             )}
           </div>
           {steps.length > 0 && (
-            <div className="mt-4 rounded-lg bg-[rgb(247,248,250)] p-3">
-              <div className="mb-2 text-xs font-medium text-gray-600">
+            <div
+              style={{
+                marginTop: 16,
+                borderRadius: 8,
+                backgroundColor: isDark ? "#222" : undefined,
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: 8,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#475569",
+                }}
+              >
                 {t("agent.ui.intermediate", { _: "中间步骤" })}
               </div>
-              <div className="space-y-1">
+              <div
+                style={{ display: "flex", flexDirection: "column", rowGap: 4 }}
+              >
                 {steps.map((s, i) => (
-                  <div key={`${i}-${s.step}`} className="text-xs text-gray-600">
+                  <div
+                    key={`${i}-${s.step}`}
+                    style={{ fontSize: 12, color: "#475569" }}
+                  >
                     {s.step}
                   </div>
                 ))}
@@ -237,39 +340,46 @@ const AgentPage: React.FC = () => {
           )}
         </Card>
 
-        <Card className="shadow-sm">
-          <div className="flex items-end gap-2">
-            <Input.TextArea
-              value={input}
-              placeholder={t("agent.ui.placeholder", {
-                _: "请输入消息，Shift+Enter 换行",
-              })}
-              autoSize={{ minRows: 2, maxRows: 6 }}
-              onChange={setInput}
-              onPressEnter={handleEnter}
-            />
-            <Space>
-              <Button
-                type="primary"
-                onClick={handleSend}
-                disabled={!agentId || streaming}
-              >
-                {t("agent.ui.send", { _: "发送" })}
-              </Button>
-              <Button onClick={handleStop} disabled={!streaming}>
-                {t("agent.ui.stop", { _: "停止" })}
-              </Button>
-              <Button
-                onClick={() => {
-                  setMessages([]);
-                  setSteps([]);
-                }}
-              >
-                {t("agent.ui.newChat", { _: "新对话" })}
-              </Button>
-            </Space>
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 16,
+            paddingLeft: 24,
+            paddingRight: 24,
+            zIndex: 1000,
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ margin: "0 auto", maxWidth: 1024 }}>
+            <Card>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                <Input.TextArea
+                  value={input}
+                  placeholder={t("agent.ui.placeholder", {
+                    _: "请输入消息，Shift+Enter 换行",
+                  })}
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                  onChange={setInput}
+                  onPressEnter={(e) => handleEnter(input, e)}
+                />
+                <Space>
+                  <Button
+                    type="primary"
+                    onClick={handleSend}
+                    disabled={!agentId || streaming}
+                  >
+                    {t("agent.ui.send", { _: "发送" })}
+                  </Button>
+                  <Button onClick={handleStop} disabled={!streaming}>
+                    {t("agent.ui.stop", { _: "停止" })}
+                  </Button>
+                </Space>
+              </div>
+            </Card>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ export type MockStreamChunk = {
 
 export type MockChatRequest = {
   agentId: string;
-  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  messages: string;
 };
 
 export type MockChatResponse = {
@@ -47,17 +47,10 @@ export async function mockListAgents(): Promise<MockAgentInfo[]> {
   return [
     {
       id: "assistant-kimi",
-      name: "Kimi 风格助手",
+      name: "Agentlz 工作助手",
       description: "温柔、简洁的 ToC 体验，支持长文本与网页总结。",
-      avatar: "https://avatars.githubusercontent.com/u/9919?s=64&v=4",
+      avatar: "/agentlz-logo.png",
       tags: ["chat", "summary", "web"],
-    },
-    {
-      id: "assistant-openai",
-      name: "OpenAI 风格助手",
-      description: "直观高效的对话与代码协作体验。",
-      avatar: "https://avatars.githubusercontent.com/u/14957082?s=64&v=4",
-      tags: ["chat", "code", "reasoning"],
     },
   ];
 }
@@ -72,8 +65,8 @@ export async function mockSendChat(
   req: MockChatRequest,
 ): Promise<MockChatResponse> {
   if (!req.agentId) throw new Error("缺少 agentId");
-  const lastUser = req.messages.filter((m) => m.role === "user").pop();
-  const content = lastUser?.content || "你好，我能帮你做些什么？";
+
+  const content = "你好，我能帮你做些什么？";
 
   const reply = `这是针对你的问题的简要回答：\n\n${content}\n\n- 我可以继续为你提供更详细的解释。\n- 如果需要，也能给出示例代码或步骤。`;
 
@@ -103,7 +96,10 @@ export async function* mockStreamChat(
 ): AsyncGenerator<MockStreamChunk, void, unknown> {
   if (!req.agentId) throw new Error("缺少 agentId");
 
-  const lastUser = req.messages.filter((m) => m.role === "user").pop();
+  const lastUser = req.messages
+    .split("\n")
+    .filter((m) => m.role === "user")
+    .pop();
   const question = lastUser?.content || "请简要介绍你能做什么";
 
   const full = `好的，已收到你的请求：\n\n${question}\n\n以下是流式演示：\n1. 分析你的意图与目标\n2. 检索相关内容并总结\n3. 生成清晰的步骤或代码示例\n\n如需更进一步，可继续追问，我会持续协助。`;

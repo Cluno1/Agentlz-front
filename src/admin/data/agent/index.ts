@@ -26,7 +26,7 @@ export type ChatMessage = {
 
 export type ChatRequest = {
   agentId: string;
-  messages: Array<{ role: ChatRole; content: string }>;
+  messages: string;
 };
 
 export type IntermediateStep = { step: string; detail?: any };
@@ -84,6 +84,7 @@ export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
 export function streamChat(
   req: ChatRequest,
 ): AsyncGenerator<StreamChunk, void, unknown> {
+  console.log(req, "streamChat req");
   if (!req.agentId) throw new Error("缺少 agentId");
   return mockStreamChat(req);
 }

@@ -8,6 +8,7 @@ import {
   Build,
   Create,
   Description,
+  Chat,
 } from "@mui/icons-material";
 import SubMenu from "../components/SubMenu";
 
@@ -28,6 +29,11 @@ export const Menu = () => {
         to="/agent"
         primaryText={translate("menu.agent")}
         leftIcon={<SmartToy />}
+      />
+      <RAMenu.Item
+        to="/chat"
+        primaryText={translate("menu.chat")}
+        leftIcon={<Chat />}
       />
       <RAMenu.Item
         to="/mcp-tools"

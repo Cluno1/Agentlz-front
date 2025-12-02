@@ -32,9 +32,18 @@ export async function listDocuments(
       per_page: perPage,
       sort: sortField,
       order: sortOrder,
-      q: (filter as any)?.q,
       type,
     };
+    const f: any = filter || {};
+    if (f.title) query.title = f.title;
+    if (f.tags) query.tags = f.tags;
+    if (f.description) query.description = f.description;
+    if (f.status) query.status = f.status;
+    if (f.upload_time_start) query.upload_time_start = f.upload_time_start;
+    if (f.upload_time_end) query.upload_time_end = f.upload_time_end;
+    if (typeof f.disabled !== "undefined") query.disabled = f.disabled;
+    if (f.uploaded_by_user_id)
+      query.uploaded_by_user_id = f.uploaded_by_user_id;
     const res = await httpClient.get("/rag", { params: query });
     const json = res.data;
     const rows =

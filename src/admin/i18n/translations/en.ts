@@ -15,6 +15,7 @@ export default {
     Management: "Management",
     userManagement: "User Management",
     agent: "Agent",
+    chat: "Chat",
     mcpTools: "MCP Tools",
     rag: "RAG Docs",
     create: "Create",

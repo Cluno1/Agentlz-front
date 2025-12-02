@@ -81,17 +81,16 @@ const RagPage: React.FC = () => {
         sortField,
         sortOrder,
         filter: {
-          q: query,
+          title: query,
           tags: tagQuery,
           description: descriptionQuery,
+          status: status === "all" ? undefined : status,
         },
         type: scope,
       });
       const rows = resp.data || [];
-      const filtered =
-        status === "all" ? rows : rows.filter((d) => d.status === status);
-      setDocs(filtered);
-      setTotal(resp.total || filtered.length);
+      setDocs(rows);
+      setTotal(resp.total || rows.length);
     } catch {
       Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
     } finally {
@@ -180,9 +179,10 @@ const RagPage: React.FC = () => {
   };
 
   const handleTableChange = (_pagination: any, _filters: any, sorter: any) => {
-    if (sorter.field) {
+    if (sorter?.field) {
       setSortField(sorter.field);
-      setSortOrder(sorter.order === "asc" ? "ASC" : "DESC");
+      const o = String(sorter.order || "").toLowerCase();
+      setSortOrder(o === "asc" || o === "ascend" ? "ASC" : "DESC");
     }
   };
 

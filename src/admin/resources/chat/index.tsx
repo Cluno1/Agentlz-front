@@ -10,7 +10,6 @@ import {
   Space,
   Spin,
   Tag,
-  Typography,
 } from "@arco-design/web-react";
 import { IconUser } from "@arco-design/web-react/icon";
 import { useTranslate } from "react-admin";
@@ -23,7 +22,7 @@ import {
 } from "../../data/agent";
 import { useDarkMode } from "../../data/hook/useDark";
 
-const AgentPage: React.FC = () => {
+const Chat: React.FC = () => {
   const t = useTranslate();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [agentId, setAgentId] = useState<string>("");
@@ -385,4 +384,4 @@ const AgentPage: React.FC = () => {
   );
 };
 
-export default AgentPage;
+export default Chat;

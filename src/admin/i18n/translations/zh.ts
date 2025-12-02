@@ -15,6 +15,7 @@ export default {
     Management: "管理",
     userManagement: "用户管理",
     agent: "智能体",
+    chat: "聊天",
     mcpTools: "mcp工具",
     rag: "知识库文档",
     create: "创造",

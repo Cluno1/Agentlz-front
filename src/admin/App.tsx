@@ -24,7 +24,9 @@ import { useEffect } from "react";
 import { useTheme } from "@mui/material/styles";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
-import AgentPage from "./resources/agent/AgentPage";
+import Chat from "./resources/chat";
+import Agent from "./resources/agent";
+import CreateAgent from "./resources/agent/CreateAgent";
 import McpToolsPage from "./resources/tools/McpToolsPage";
 import RagPage from "./resources/rag/RagPage";
 import CreatePage from "./resources/create/CreatePage";
@@ -115,13 +117,22 @@ export const App = () => (
       }
     />
     <Resource
-      name="agent"
+      name="chat"
       list={
         <ArcoLocaleBridge>
-          <AgentPage />
+          <Chat />
         </ArcoLocaleBridge>
       }
     />
+    <Resource
+      name="agent"
+      list={
+        <ArcoLocaleBridge>
+          <Agent />
+        </ArcoLocaleBridge>
+      }
+    />
+
     <Resource
       name="mcp-tools"
       list={
@@ -153,6 +164,14 @@ export const App = () => (
         element={
           <ArcoLocaleBridge>
             <RagUploadPage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Route
+        path="/agent/create"
+        element={
+          <ArcoLocaleBridge>
+            <CreateAgent />
           </ArcoLocaleBridge>
         }
       />

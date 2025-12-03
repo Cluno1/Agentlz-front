@@ -11,7 +11,7 @@ import {
   Table,
   Tag,
   Form,
-  Switch,
+  Radio,
   Avatar,
   Spin,
 } from "@arco-design/web-react";
@@ -100,11 +100,10 @@ const CreateAgent: React.FC = () => {
       const payload = {
         name: values.name,
         description: values.description || undefined,
-        disabled: values.disabled || false,
         document_ids: selectedDocIds.length ? selectedDocIds : undefined,
         mcp_agent_ids: undefined,
       };
-      await createAgent(payload);
+      await createAgent(payload, values.type || "self");
       Message.success(t("common.success", { _: "操作成功" }));
       navigate("/agent");
     } catch (e) {
@@ -376,11 +375,18 @@ const CreateAgent: React.FC = () => {
                   <Input.TextArea rows={3} />
                 </Form.Item>
                 <Form.Item
-                  label={t("agent.ui.columns.disabled", { _: "停用" })}
-                  field="disabled"
-                  triggerPropName="checked"
+                  label={t("agent.ui.columns.type", { _: "类型" })}
+                  field="type"
+                  initialValue="self"
                 >
-                  <Switch />
+                  <Radio.Group>
+                    <Radio value="self">
+                      {t("rag.ui.tabs.self", { _: "个人" })}
+                    </Radio>
+                    <Radio value="tenant">
+                      {t("rag.ui.tabs.tenant", { _: "租户" })}
+                    </Radio>
+                  </Radio.Group>
                 </Form.Item>
                 <Form.Item label={t("agent.ui.baseMessage", { _: "基础消息" })}>
                   <Input.TextArea

@@ -131,6 +131,54 @@ export default {
       send: "发送",
       stop: "停止",
       newChat: "新对话",
+      tabs: {
+        self: "个人",
+        tenant: "租户",
+      },
+      create: "创建智能体",
+      searchPlaceholder: "按名称/描述搜索",
+      search: "搜索",
+      refresh: "刷新",
+      categories: {
+        all: "全部",
+      },
+      status: {
+        enabled: "启用",
+        disabled: "停用",
+      },
+      stats: {
+        total: "总计",
+      },
+      columns: {
+        name: "名称",
+        description: "描述",
+        disabled: "停用",
+        mcpIds: "MCP ID",
+        docCount: "文档数量",
+        tenant: "租户",
+        createdAt: "创建时间",
+        operations: "操作",
+        edit: "修改",
+        updateApi: "更新密钥",
+        deleteConfirm: "确认删除该 Agent 吗？",
+        delete: "删除",
+        apiName: "API 名称",
+        apiKey: "API 密钥",
+        type: "类型",
+      },
+      baseMessage: "基础消息",
+      ragMessage: "RAG 消息",
+      mcpMessage: "MCP 消息",
+      preview: {
+        reply: "这是预览回复",
+      },
+      mcp: {
+        empty: "暂无 MCP 数据",
+      },
+      new: "新智能体",
+    },
+    create: {
+      title: "创建智能体",
     },
     msg: {
       loadAgentsFail: "获取助手列表失败",
@@ -181,6 +229,7 @@ export default {
         system: "系统",
       },
       columns: {
+        id: "ID",
         name: "名称",
         size: "大小",
         type: "类型",
@@ -209,6 +258,10 @@ export default {
       clear: "清空",
       categories: {
         all: "全部",
+      },
+      selected: {
+        count: "已选择",
+        none: "未选择",
       },
       fileName: "文件名称",
       fileNamePlaceholder: "请输入文件名称",

@@ -15,6 +15,7 @@ import {
   Modal,
   Form,
   Switch,
+  Popover,
 } from "@arco-design/web-react";
 import {
   IconRefresh,
@@ -250,18 +251,31 @@ const AgentListPage: React.FC = () => {
       ),
     },
     {
-      title: t("agent.ui.columns.docIds", { _: "文档ID" }),
-      dataIndex: "document_ids",
+      title: t("agent.ui.columns.docCount", { _: "文档数量" }),
+      dataIndex: "documents",
       width: 160,
-      render: (v: string[] | undefined) => (
-        <Space wrap>
-          {(v || []).map((id, idx) => (
-            <Tag key={`${id}-${idx}`} size="small">
-              {id}
-            </Tag>
-          ))}
-        </Space>
-      ),
+      render: (docs: Array<{ id: string; name: string }> | undefined) => {
+        const list = docs || [];
+        const count = list.length;
+        if (count === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 320 }}>
+                {list.map((d, idx) => (
+                  <div key={`${d.id}-${idx}`} style={{ marginBottom: 4 }}>
+                    <span>{d.name}</span>
+                  </div>
+                ))}
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
+        );
+      },
     },
     {
       title: t("agent.ui.columns.tenant", { _: "租户" }),
@@ -278,7 +292,7 @@ const AgentListPage: React.FC = () => {
     {
       title: t("agent.ui.columns.operations", { _: "操作" }),
       dataIndex: "operations",
-      width: 240,
+      width: 140,
       render: (_: any, record: ListAgentsNameSpace.ListAgentsResult) => (
         <Space>
           <Button icon={<IconEdit />} onClick={() => openEdit(record)}>

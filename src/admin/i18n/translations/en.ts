@@ -131,6 +131,54 @@ export default {
       send: "Send",
       stop: "Stop",
       newChat: "New chat",
+      tabs: {
+        self: "Personal",
+        tenant: "Tenant",
+      },
+      create: "Create Agent",
+      searchPlaceholder: "Search by name/description",
+      search: "Search",
+      refresh: "Refresh",
+      categories: {
+        all: "All",
+      },
+      status: {
+        enabled: "Enabled",
+        disabled: "Disabled",
+      },
+      stats: {
+        total: "Total",
+      },
+      columns: {
+        name: "Name",
+        description: "Description",
+        disabled: "Disabled",
+        mcpIds: "MCP ID",
+        docCount: "Documents",
+        tenant: "Tenant",
+        createdAt: "Created At",
+        operations: "Operations",
+        edit: "Edit",
+        updateApi: "Update Secret",
+        deleteConfirm: "Delete this Agent?",
+        delete: "Delete",
+        apiName: "API Name",
+        apiKey: "API Key",
+        type: "Type",
+      },
+      baseMessage: "Base Message",
+      ragMessage: "RAG Message",
+      mcpMessage: "MCP Message",
+      preview: {
+        reply: "This is a preview reply",
+      },
+      mcp: {
+        empty: "No MCP data",
+      },
+      new: "New Agent",
+    },
+    create: {
+      title: "Create Agent",
     },
     msg: {
       loadAgentsFail: "Failed to load assistants",
@@ -182,6 +230,7 @@ export default {
         system: "System",
       },
       columns: {
+        id: "ID",
         name: "Name",
         size: "Size",
         type: "Type",
@@ -210,6 +259,10 @@ export default {
       clear: "Clear",
       categories: {
         all: "All",
+      },
+      selected: {
+        count: "Selected",
+        none: "None",
       },
       fileName: "File Name",
       fileNamePlaceholder: "Enter file name",

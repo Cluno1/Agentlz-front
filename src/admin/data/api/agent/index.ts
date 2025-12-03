@@ -73,9 +73,12 @@ export async function getAgent(
  */
 export async function createAgent(
   payload: CreateAgentNameSpace.CreateAgentParams,
+  type: "self" | "tenant" = "self",
 ): Promise<CreateAgentNameSpace.CreateAgentResult> {
   try {
-    const res = await httpClient.post("/agents", payload);
+    const res = await httpClient.post("/agents", payload, {
+      params: { type },
+    });
     return (res.data?.data ??
       res.data) as CreateAgentNameSpace.CreateAgentResult;
   } catch (error) {

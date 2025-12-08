@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { useGetOne, useTranslate, Title } from "react-admin";
 import { useParams } from "react-router-dom";
 import {
@@ -145,15 +146,14 @@ const RagShow: React.FC = () => {
         onCancel={() => setDrawerVisible(false)}
         style={cardColorStyle}
       >
-        <pre
+        <div
           style={{
-            whiteSpace: "pre-wrap",
             wordBreak: "break-word",
             color: textColor,
           }}
         >
-          {data.content}
-        </pre>
+          <ReactMarkdown>{String(data.content || "")}</ReactMarkdown>
+        </div>
       </Drawer>
     </Card>
   );

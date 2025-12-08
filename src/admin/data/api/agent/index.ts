@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import httpClient from "../../httpClient";
+import type { AgentChatInput, AgentChatStreamChunk } from "./type";
 import type {
   PaginationParams,
   PaginationResult,
@@ -36,6 +37,42 @@ export async function listAgents(
       type,
     };
     const res = await httpClient.get("/agents", { params: query });
+    const json = res.data;
+    const rows =
+      (json?.data?.rows as any[]) ??
+      (json?.rows as any[]) ??
+      (Array.isArray(json) ? (json as any[]) : []);
+    const total = json?.data?.total ?? json?.total ?? rows.length ?? 0;
+    return { data: rows as ListAgentsNameSpace.ListAgentsResult[], total };
+  } catch (error) {
+    console.error("接口错误", error);
+    throw error as any;
+  }
+}
+/** @description 获取可访问 Agent 列表（分页）
+ * 参数：分页/排序/搜索（q）
+ * 返回值：{ data: 列表[], total: 总数 }
+ * 异常：网络或权限错误时抛出 Error，并打印“接口错误”
+ */
+export async function listAccessibleAgents(
+  params: PaginationParams,
+): Promise<PaginationResult<ListAgentsNameSpace.ListAgentsResult>> {
+  try {
+    const {
+      page = 1,
+      perPage = 10,
+      sortField = "id",
+      sortOrder = "DESC",
+      filter,
+    } = params || ({} as PaginationParams);
+    const query: any = {
+      page,
+      per_page: perPage,
+      sort: sortField,
+      order: sortOrder,
+      q: (filter as any)?.q,
+    };
+    const res = await httpClient.get("/agents/accessible", { params: query });
     const json = res.data;
     const rows =
       (json?.data?.rows as any[]) ??
@@ -137,4 +174,57 @@ export async function deleteAgent(agentId: number): Promise<void> {
     console.error("接口错误", error);
     throw error as any;
   }
+}
+
+export async function* chatAgentStream(
+  payload: AgentChatInput,
+  opts?: { signal?: AbortSignal },
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  const base =
+    (httpClient.defaults as any)?.baseURL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "";
+  const tokenKey = import.meta.env.VITE_TOKEN_KEY as string;
+  const tenantKey = import.meta.env.VITE_TENANT_ID as string;
+  const token = tokenKey ? localStorage.getItem(tokenKey) : undefined;
+  const tenantId = tenantKey ? localStorage.getItem(tenantKey) : undefined;
+
+  const res = await fetch(`${base}/agent/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal: opts?.signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("聊天接口请求失败");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+    for (const evt of events) {
+      const line = evt
+        .split("\n")
+        .find((l) => l.startsWith("data:"))
+        ?.replace(/^data:\s*/, "");
+      if (!line) continue;
+      try {
+        const obj = JSON.parse(line) as AgentChatStreamChunk;
+        yield obj;
+      } catch {
+        yield { delta: line };
+      }
+    }
+  }
+  yield { done: true };
 }

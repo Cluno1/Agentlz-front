@@ -99,3 +99,21 @@ export namespace UpdateAgentApiNameSpace {
     [k: string]: any;
   }
 }
+
+export interface AgentChatInput {
+  agent_id?: number;
+  api_name?: string;
+  api_key?: string;
+  type: 0 | 1;
+  record_id?: number;
+  meta?: Record<string, any>;
+  message: string;
+  [k: string]: any;
+}
+
+export interface AgentChatStreamChunk {
+  delta?: string;
+  text?: string;
+  done?: boolean;
+  [k: string]: any;
+}

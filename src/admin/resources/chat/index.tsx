@@ -12,20 +12,26 @@ import {
   Tag,
 } from "@arco-design/web-react";
 import { IconUser } from "@arco-design/web-react/icon";
-import { useTranslate } from "react-admin";
-import {
-  listAgents,
-  sendChat,
-  streamChat,
-  type AgentInfo,
-  type ChatMessage,
-} from "../../data/agent";
+import { useTranslate, useGetIdentity } from "react-admin";
+import { type AgentInfo, type ChatMessage } from "../../data/agent";
+import { chatAgentStream } from "../../data/api/agent";
+import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
+type ApiAgentRow = {
+  id?: number | string;
+  agent_id?: number | string;
+  name?: string;
+  description?: string;
+  avatar?: string;
+  tags?: string[];
+};
 
 const Chat: React.FC = () => {
   const t = useTranslate();
+  const { identity } = useGetIdentity();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [agentId, setAgentId] = useState<string>("");
+  const [query, setQuery] = useState<string>("");
   // 记录当前的消息
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState<string>("");
@@ -36,19 +42,49 @@ const Chat: React.FC = () => {
     Array<{ step: string; detail?: Record<string, unknown> }>
   >([]);
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
+  const abortCtrlRef = useRef<AbortController | null>(null);
+  const assistantIdRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const { isDark } = useDarkMode();
 
+  const fetchAgents = React.useCallback(
+    async (q: string) => {
+      try {
+        const resp = await listAccessibleAgents({
+          page: 1,
+          perPage: 50,
+          filter: { q },
+        });
+        const rows = (resp?.data ?? []) as ApiAgentRow[];
+        const mapped: AgentInfo[] = rows.map((a) => ({
+          id: String(a.id ?? a.agent_id ?? ""),
+          name: a.name ?? "",
+          description: a.description ?? "",
+          avatar: a.avatar,
+          tags: a.tags ?? [],
+        }));
+        setAgents(mapped);
+      } catch {
+        Message.error(t("agent.msg.loadAgentsFail", { _: "加载失败" }));
+      }
+    },
+    [t],
+  );
+
   useEffect(() => {
-    listAgents()
-      .then((res) => {
-        setAgents(res);
-        if (res.length > 0) setAgentId(res[0].id);
-      })
-      .catch(() =>
-        Message.error(t("agent.msg.loadAgentsFail", { _: "加载失败" })),
-      );
-  }, [t]);
+    fetchAgents("");
+  }, [fetchAgents]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      fetchAgents(query.trim());
+    }, 300);
+    return () => clearTimeout(id);
+  }, [query, fetchAgents]);
+
+  useEffect(() => {
+    if (!agentId && agents.length > 0) setAgentId(agents[0].id);
+  }, [agents, agentId]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -67,60 +103,66 @@ const Chat: React.FC = () => {
     // 清空当前的步骤
     setSteps([]);
     streamAbortRef.current.aborted = false;
+    const ts = Date.now();
+    const assistantId = `${ts}-a`;
+    assistantIdRef.current = assistantId;
     const userMsg: ChatMessage = {
-      id: `${Date.now()}-u`,
+      id: `${ts}-u`,
       role: "user",
       content: text,
-      createdAt: Date.now(),
+      createdAt: ts,
     };
     setMessages((prev) => [
       ...prev,
       userMsg,
       {
-        id: `${Date.now()}-a`,
+        id: assistantId,
         role: "assistant",
         content: "",
-        createdAt: Date.now(),
+        createdAt: ts,
       },
     ]);
     setInput("");
     setStreaming(true);
     try {
-      const req = {
-        agentId,
-        messages: text,
+      abortCtrlRef.current = new AbortController();
+      const payload = {
+        agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
+        type: 0 as const,
+        meta: { user_id: String(identity?.id ?? "") },
+        message: text,
       };
-      const gen = streamChat(req);
+      const gen = chatAgentStream(payload, {
+        signal: abortCtrlRef.current.signal,
+      });
       for await (const chunk of gen) {
         if (streamAbortRef.current.aborted) break;
         setMessages((prev) => {
           const next = [...prev];
-          const idx = next.findIndex(
-            (m) => m.role === "assistant" && m.content === "",
-          );
+          const idx = next.findIndex((m) => m.id === assistantIdRef.current);
           if (idx !== -1)
             next[idx] = {
               ...next[idx],
-              content: next[idx].content + (chunk.delta || ""),
+              content: next[idx].content + (chunk.delta || chunk.text || ""),
             };
           return next;
         });
-      }
-      if (!streamAbortRef.current.aborted) {
-        const resp = await sendChat(req);
-        setSteps(resp.intermediate_steps || []);
+        if (chunk.done) break;
       }
     } catch (e) {
       Message.error(t("agent.msg.streamFail", { _: "流式失败" }));
     } finally {
       setStreaming(false);
       streamAbortRef.current.aborted = false;
+      abortCtrlRef.current = null;
+      assistantIdRef.current = null;
     }
   };
 
   const handleStop = () => {
     if (!streaming) return;
     streamAbortRef.current.aborted = true;
+    abortCtrlRef.current?.abort();
     setStreaming(false);
   };
 
@@ -160,8 +202,29 @@ const Chat: React.FC = () => {
             justifyContent: "space-between",
           }}
         >
-          <Button onClick={() => setMessages([])}>新对话 +</Button>
+          <Button
+            onClick={() => {
+              setMessages([]);
+              setSteps([]);
+              streamAbortRef.current.aborted = false;
+              abortCtrlRef.current?.abort();
+              setStreaming(false);
+              assistantIdRef.current = null;
+            }}
+          >
+            新对话 +
+          </Button>
           <Space>
+            <Input.Search
+              value={query}
+              allowClear
+              placeholder={t("agent.ui.searchPlaceholder", {
+                _: "搜索助手名称",
+              })}
+              onChange={setQuery}
+              onSearch={(v) => setQuery(v)}
+              style={{ width: 240 }}
+            />
             <Select
               value={agentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
@@ -178,12 +241,28 @@ const Chat: React.FC = () => {
                     }}
                   >
                     {a.avatar ? (
-                      <Avatar size={20}>
-                        <img src={a.avatar} alt={a.name} />
+                      <Avatar size={20} style={{ flexShrink: 0 }}>
+                        <img
+                          src={a.avatar}
+                          alt={a.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
                       </Avatar>
                     ) : (
-                      <Avatar size={20}>
-                        <img src="/agentlz-robot.jpg" alt={a.name} />
+                      <Avatar size={20} style={{ flexShrink: 0 }}>
+                        <img
+                          src="/agentlz-robot.jpg"
+                          alt={a.name}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
                       </Avatar>
                     )}
                     <span>{a.name}</span>
@@ -198,12 +277,28 @@ const Chat: React.FC = () => {
           <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {currentAgent.avatar ? (
-                <Avatar size={28}>
-                  <img src={currentAgent.avatar} alt={currentAgent.name} />
+                <Avatar size={28} style={{ flexShrink: 0 }}>
+                  <img
+                    src={currentAgent.avatar}
+                    alt={currentAgent.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </Avatar>
               ) : (
-                <Avatar size={28}>
-                  <img src="/agentlz-robot.jpg" alt={currentAgent.name} />
+                <Avatar size={28} style={{ flexShrink: 0 }}>
+                  <img
+                    src="/agentlz-robot.jpg"
+                    alt={currentAgent.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </Avatar>
               )}
               <div style={{ flex: 1 }}>
@@ -261,14 +356,22 @@ const Chat: React.FC = () => {
                   }}
                 >
                   {m.role === "user" ? (
-                    <Avatar size={28} style={{ backgroundColor: "#165DFF" }}>
+                    <Avatar
+                      size={28}
+                      style={{ backgroundColor: "#165DFF", flexShrink: 0 }}
+                    >
                       <IconUser />
                     </Avatar>
                   ) : (
-                    <Avatar size={28}>
+                    <Avatar size={28} style={{ flexShrink: 0 }}>
                       <img
                         src="/agentlz-robot.jpg"
                         alt={currentAgent?.name || ""}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
                       />
                     </Avatar>
                   )}

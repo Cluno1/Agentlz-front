@@ -68,6 +68,10 @@ const AgentListPage: React.FC = () => {
   const [apiRecord, setApiRecord] =
     useState<ListAgentsNameSpace.ListAgentsResult | null>(null);
 
+  const isDefaultTenant =
+    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
+    "default";
+
   useEffect(() => {
     fetchAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -277,11 +281,15 @@ const AgentListPage: React.FC = () => {
         );
       },
     },
-    {
-      title: t("agent.ui.columns.tenant", { _: "租户" }),
-      dataIndex: "tenant_id",
-      width: 120,
-    },
+    ...(!isDefaultTenant
+      ? [
+          {
+            title: t("agent.ui.columns.tenant", { _: "租户" }),
+            dataIndex: "tenant_id",
+            width: 120,
+          },
+        ]
+      : []),
     {
       title: t("agent.ui.columns.createdAt", { _: "创建时间" }),
       dataIndex: "created_at",
@@ -333,12 +341,14 @@ const AgentListPage: React.FC = () => {
             >
               {t("agent.ui.tabs.self", { _: "个人" })}
             </Button>
-            <Button
-              type={scope === "tenant" ? "primary" : "outline"}
-              onClick={() => setScope("tenant")}
-            >
-              {t("agent.ui.tabs.tenant", { _: "租户" })}
-            </Button>
+            {!isDefaultTenant && (
+              <Button
+                type={scope === "tenant" ? "primary" : "outline"}
+                onClick={() => setScope("tenant")}
+              >
+                {t("agent.ui.tabs.tenant", { _: "租户" })}
+              </Button>
+            )}
           </Button.Group>
         </Space>
         <Button type="primary" onClick={() => navigate("/agent/create")}>

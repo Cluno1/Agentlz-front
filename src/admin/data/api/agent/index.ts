@@ -218,6 +218,10 @@ export async function* chatAgentStream(
         .find((l) => l.startsWith("data:"))
         ?.replace(/^data:\s*/, "");
       if (!line) continue;
+      if (line.trim() === "[DONE]") {
+        yield { done: true };
+        return;
+      }
       try {
         const obj = JSON.parse(line) as AgentChatStreamChunk;
         yield obj;

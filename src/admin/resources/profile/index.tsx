@@ -26,6 +26,9 @@ const ProfileShow = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { textColor, cardColorStyle } = useDarkMode();
+  const isDefaultTenant =
+    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
+    "default";
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -126,20 +129,26 @@ const ProfileShow = () => {
                       minWidth: "200px",
                     }}
                   >
-                    <div className="flex items-center gap-2">
-                      {form.getFieldValue("role") && (
-                        <Tag color="blue">
-                          {t(`user.role.${form.getFieldValue("role")}`)}
-                        </Tag>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {form.getFieldValue("tenant_id") && (
-                        <Tag color="blue">
-                          {form.getFieldValue("tenant_id")}
-                        </Tag>
-                      )}
-                    </div>
+                    {!isDefaultTenant && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          {form.getFieldValue("role") && (
+                            <Tag color="blue">
+                              {`${t("profile.fields.role")}: ${t(
+                                `user.role.${form.getFieldValue("role")}`,
+                              )}`}
+                            </Tag>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {form.getFieldValue("tenant_id") && (
+                            <Tag color="blue">
+                              {`${t("profile.fields.tenant")}: ${form.getFieldValue("tenant_id")}`}
+                            </Tag>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -310,25 +319,27 @@ const ProfileShow = () => {
                   {form.getFieldValue("created_by_id") || "-"}
                 </div>
               </div>
-              <div>
-                <div
-                  style={{
-                    marginBottom: 2,
-                    color: textColor,
-                  }}
-                >
-                  {t("profile.fields.tenant")}
+              {!isDefaultTenant && (
+                <div>
+                  <div
+                    style={{
+                      marginBottom: 2,
+                      color: textColor,
+                    }}
+                  >
+                    {t("profile.fields.tenant")}
+                  </div>
+                  <div
+                    style={{
+                      marginBottom: 6,
+                      fontWeight: "bold",
+                      color: textColor,
+                    }}
+                  >
+                    {form.getFieldValue("tenant_id") || "-"}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    marginBottom: 6,
-                    fontWeight: "bold",
-                    color: textColor,
-                  }}
-                >
-                  {form.getFieldValue("tenant_id") || "-"}
-                </div>
-              </div>
+              )}
               <div>
                 <div
                   style={{

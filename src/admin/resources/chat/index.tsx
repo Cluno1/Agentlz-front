@@ -15,6 +15,10 @@ import { IconUser } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
 import { chatAgentStream } from "../../data/api/agent";
+import type {
+  AgentChatInput,
+  AgentChatStreamChunk,
+} from "../../data/api/agent/type";
 import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
 type ApiAgentRow = {
@@ -46,6 +50,7 @@ const Chat: React.FC = () => {
   const assistantIdRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const { isDark } = useDarkMode();
+  const [recordId, setRecordId] = useState<number | null>(null);
 
   const fetchAgents = React.useCallback(
     async (q: string) => {
@@ -126,17 +131,27 @@ const Chat: React.FC = () => {
     setStreaming(true);
     try {
       abortCtrlRef.current = new AbortController();
-      const payload = {
+      const isContinue = recordId != null;
+      const payload: AgentChatInput = {
         agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
-        type: 0 as const,
+        type: (isContinue ? 1 : 0) as 0 | 1,
         meta: { user_id: String(identity?.id ?? "") },
         message: text,
+        ...(isContinue ? { record_id: recordId as number } : {}),
       };
       const gen = chatAgentStream(payload, {
         signal: abortCtrlRef.current.signal,
       });
-      for await (const chunk of gen) {
+      for await (const chunk of gen as AsyncGenerator<
+        AgentChatStreamChunk & { record_id?: number },
+        void,
+        unknown
+      >) {
         if (streamAbortRef.current.aborted) break;
+        if (chunk?.record_id != null && recordId == null) {
+          const rid = Number(chunk.record_id);
+          if (!Number.isNaN(rid)) setRecordId(rid);
+        }
         setMessages((prev) => {
           const next = [...prev];
           const idx = next.findIndex((m) => m.id === assistantIdRef.current);
@@ -210,6 +225,7 @@ const Chat: React.FC = () => {
               abortCtrlRef.current?.abort();
               setStreaming(false);
               assistantIdRef.current = null;
+              setRecordId(null);
             }}
           >
             新对话 +

@@ -25,6 +25,29 @@ const RagUploadPage: React.FC = () => {
   const [docType, setDocType] = useState<string>("self");
   const [fileName, setFileName] = useState<string>("");
 
+  const isDefaultTenant =
+    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
+    "default";
+
+  const docTypeOptions = [
+    {
+      label: t("rag.ui.type.self", { _: "个人文档" }),
+      value: "self",
+    },
+    ...(!isDefaultTenant
+      ? [
+          {
+            label: t("rag.ui.type.tenant", { _: "租户文档" }),
+            value: "tenant",
+          },
+        ]
+      : []),
+    {
+      label: t("rag.ui.type.system", { _: "系统文档" }),
+      value: "system",
+    },
+  ];
+
   const toArrayBuffer = (file: File) =>
     new Promise<ArrayBuffer>((resolve, reject) => {
       const reader = new FileReader();
@@ -118,20 +141,7 @@ const RagUploadPage: React.FC = () => {
             value={docType}
             onChange={setDocType}
             style={{ width: 200 }}
-            options={[
-              {
-                label: t("rag.ui.type.self", { _: "个人文档" }),
-                value: "self",
-              },
-              {
-                label: t("rag.ui.type.tenant", { _: "租户文档" }),
-                value: "tenant",
-              },
-              {
-                label: t("rag.ui.type.system", { _: "系统文档" }),
-                value: "system",
-              },
-            ]}
+            options={docTypeOptions as any}
             disabled={!fileList.length}
           />
         </div>

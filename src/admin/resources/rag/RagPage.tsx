@@ -63,10 +63,19 @@ const RagPage: React.FC = () => {
   const [sortField, setSortField] = useState<string>("id");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
 
+  const isDefaultTenant =
+    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
+    "default";
+
   useEffect(() => {
     fetchDocs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, scope, page, pageSize, sortField, sortOrder]);
+
+  useEffect(() => {
+    if (isDefaultTenant && scope === "tenant") setScope("self");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openUploadPage = () => {
     navigate("/rag/upload");
@@ -269,11 +278,15 @@ const RagPage: React.FC = () => {
       ),
       width: 80,
     },
-    {
-      title: t("rag.ui.columns.tenant", { _: "租户" }),
-      dataIndex: "tenant_name",
-      width: 120,
-    },
+    ...(!isDefaultTenant
+      ? [
+          {
+            title: t("rag.ui.columns.tenant", { _: "租户" }),
+            dataIndex: "tenant_name",
+            width: 120,
+          },
+        ]
+      : []),
     {
       title: t("rag.ui.columns.tags", { _: "标签" }),
       dataIndex: "tags",
@@ -350,12 +363,14 @@ const RagPage: React.FC = () => {
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
-            <Button
-              type={scope === "tenant" ? "primary" : "outline"}
-              onClick={() => setScope("tenant")}
-            >
-              {t("rag.ui.tabs.tenant", { _: "租户" })}
-            </Button>
+            {!isDefaultTenant && (
+              <Button
+                type={scope === "tenant" ? "primary" : "outline"}
+                onClick={() => setScope("tenant")}
+              >
+                {t("rag.ui.tabs.tenant", { _: "租户" })}
+              </Button>
+            )}
             <Button
               type={scope === "system" ? "primary" : "outline"}
               onClick={() => setScope("system")}

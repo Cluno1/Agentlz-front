@@ -34,6 +34,7 @@ export default {
       disabled: "禁用登录",
       createdAt: "创建时间",
       createdById: "创建人ID",
+      tenant: "租户",
       id: "用户ID",
       account: "账号信息",
       activity: "活动",

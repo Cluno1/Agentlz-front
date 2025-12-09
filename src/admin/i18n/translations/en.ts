@@ -34,6 +34,7 @@ export default {
       disabled: "Disabled Login",
       createdAt: "Created At",
       createdById: "Created By ID",
+      tenant: "Tenant",
       id: "User ID",
       account: "Account",
       activity: "Activity",

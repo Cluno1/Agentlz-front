@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import httpClient from "../../httpClient";
-import type { AgentChatInput, AgentChatStreamChunk } from "./type";
+import type {
+  AgentChatInput,
+  AgentChatStreamChunk,
+  AgentChatHistoryInput,
+  AgentChatRecord,
+  AgentChatSessionInput,
+  AgentChatSession,
+} from "./type";
 import type {
   PaginationParams,
   PaginationResult,
@@ -176,6 +183,42 @@ export async function deleteAgent(agentId: number): Promise<void> {
   }
 }
 
+export async function listAgentChatHistory(
+  payload: AgentChatHistoryInput,
+): Promise<PaginationResult<AgentChatRecord>> {
+  try {
+    const res = await httpClient.post("/agent/chat/history", payload);
+    const json = res.data;
+    const rows =
+      (json?.data?.rows as any[]) ??
+      (json?.rows as any[]) ??
+      (Array.isArray(json) ? (json as any[]) : []);
+    const total = json?.data?.total ?? json?.total ?? rows.length ?? 0;
+    return { data: rows as AgentChatRecord[], total };
+  } catch (error) {
+    console.error("接口错误", error);
+    throw error as any;
+  }
+}
+
+export async function listAgentChatSessions(
+  payload: AgentChatSessionInput,
+): Promise<PaginationResult<AgentChatSession>> {
+  try {
+    const res = await httpClient.post("/agent/chat/session", payload);
+    const json = res.data;
+    const rows =
+      (json?.data?.rows as any[]) ??
+      (json?.rows as any[]) ??
+      (Array.isArray(json) ? (json as any[]) : []);
+    const total = json?.data?.total ?? json?.total ?? rows.length ?? 0;
+    return { data: rows as AgentChatSession[], total };
+  } catch (error) {
+    console.error("接口错误", error);
+    throw error as any;
+  }
+}
+
 export async function* chatAgentStream(
   payload: AgentChatInput,
   opts?: { signal?: AbortSignal },
@@ -222,12 +265,44 @@ export async function* chatAgentStream(
         yield { done: true };
         return;
       }
-      try {
-        const obj = JSON.parse(line) as AgentChatStreamChunk;
-        yield obj;
-      } catch {
-        yield { delta: line };
+      const trimmed = line.trim();
+      let parsed: any = undefined;
+      // 仅当看起来是对象/数组时尝试 JSON 解析
+      const looksLikeJsonObject =
+        trimmed.startsWith("{") || trimmed.startsWith("[");
+      if (looksLikeJsonObject) {
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          parsed = undefined;
+        }
+      } else {
+        // 非对象/数组（例如数字、纯文本）直接作为 delta 输出
+        yield { delta: trimmed };
+        continue;
       }
+
+      // 如果解析得到的是对象，并且包含已知字段，则直接透传
+      if (parsed && typeof parsed === "object") {
+        // 兼容形如 { record_id: 7 } 或 { delta: "..." } 的事件
+        if (
+          "delta" in parsed ||
+          "text" in parsed ||
+          "record_id" in parsed ||
+          "done" in parsed
+        ) {
+          yield parsed as AgentChatStreamChunk;
+          continue;
+        }
+      }
+
+      // 其余情况，作为文本 token 处理
+      yield {
+        delta:
+          typeof parsed !== "object" && parsed != null
+            ? String(parsed)
+            : trimmed,
+      };
     }
   }
   yield { done: true };

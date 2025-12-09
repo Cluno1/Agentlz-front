@@ -14,11 +14,12 @@ import {
 import { IconUser } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
-import { chatAgentStream } from "../../data/api/agent";
+import { chatAgentStream, listAgentChatSessions } from "../../data/api/agent";
 import type {
   AgentChatInput,
   AgentChatStreamChunk,
 } from "../../data/api/agent/type";
+import HistoryDrawer from "./components/HistoryDrawer";
 import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
 type ApiAgentRow = {
@@ -51,6 +52,26 @@ const Chat: React.FC = () => {
   const listRef = useRef<HTMLDivElement | null>(null);
   const { isDark } = useDarkMode();
   const [recordId, setRecordId] = useState<number | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [sessionsPage, setSessionsPage] = useState(1);
+  const [sessionsPerPage] = useState(15);
+  const [sessionsTotal, setSessionsTotal] = useState(0);
+  const [sessionsLoadedCount, setSessionsLoadedCount] = useState(0);
+  const lastUpdateWasPrependRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(import.meta.env.VITE_IDENTITY_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setUserAvatar(parsed?.avatar || null);
+      }
+    } catch {
+      setUserAvatar(null);
+    }
+  }, []);
 
   const fetchAgents = React.useCallback(
     async (q: string) => {
@@ -94,6 +115,10 @@ const Chat: React.FC = () => {
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
+    if (lastUpdateWasPrependRef.current) {
+      lastUpdateWasPrependRef.current = false;
+      return;
+    }
     el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
@@ -174,6 +199,123 @@ const Chat: React.FC = () => {
     }
   };
 
+  const fetchSessions = React.useCallback(async () => {
+    if (!agentId || !recordId) return;
+    try {
+      setSessionsLoading(true);
+      const resp = await listAgentChatSessions({
+        agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
+        meta: { user_id: String(identity?.id ?? "") },
+        record_id: recordId as number,
+        page: sessionsPage,
+        per_page: sessionsPerPage,
+      });
+      const rows = resp.data || [];
+      setSessionsTotal(resp.total || 0);
+      setSessionsLoadedCount((prev) =>
+        sessionsPage === 1 ? rows.length : prev + rows.length,
+      );
+      const el = listRef.current;
+      const prevHeight = el?.scrollHeight ?? 0;
+      const prevTop = el?.scrollTop ?? 0;
+      const list: Array<{
+        id: string;
+        role: "user" | "assistant" | "system";
+        content: string;
+        createdAt: number;
+      }> = [];
+      for (const s of rows) {
+        const ts = s.created_at
+          ? new Date(s.created_at).getTime()
+          : s.time
+            ? new Date(String(s.time)).getTime()
+            : Date.now();
+        const input = typeof s.input === "string" ? s.input : undefined;
+        const output = typeof s.output === "string" ? s.output : undefined;
+        if (input && input.trim()) {
+          list.push({
+            id: `${String(s.id ?? Math.random())}-u`,
+            role: "user",
+            content: input,
+            createdAt: ts,
+          });
+        }
+        if (output && output.trim()) {
+          list.push({
+            id: `${String(s.id ?? Math.random())}-a`,
+            role: "assistant",
+            content: output,
+            createdAt: ts + 1,
+          });
+        }
+        if ((!input || !input.trim()) && (!output || !output.trim())) {
+          const content = String(s.content ?? s.message ?? "");
+          if (content) {
+            list.push({
+              id: `${String(s.id ?? Math.random())}-m`,
+              role: (s.role as "user" | "assistant" | "system") || "assistant",
+              content,
+              createdAt: ts,
+            });
+          }
+        }
+      }
+      list.sort((a, b) => a.createdAt - b.createdAt);
+      lastUpdateWasPrependRef.current = sessionsPage > 1;
+      setMessages((prev) => {
+        const map = new Map<string, (typeof prev)[number]>();
+        for (const m of [...prev, ...list]) map.set(m.id, m);
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => a.createdAt - b.createdAt);
+        return merged;
+      });
+      setTimeout(() => {
+        const el2 = listRef.current;
+        if (!el2) return;
+        const newHeight = el2.scrollHeight;
+        if (sessionsPage > 1) {
+          el2.scrollTop = prevTop + (newHeight - prevHeight);
+        }
+      }, 0);
+    } catch (e: unknown) {
+      const msg =
+        typeof e === "object" && e && "message" in e
+          ? (e as { message?: string }).message
+          : undefined;
+      Message.error(msg || "加载失败");
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [agentId, recordId, identity, sessionsPage, sessionsPerPage]);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [recordId, fetchSessions]);
+
+  useEffect(() => {
+    if (!recordId) return;
+    fetchSessions();
+  }, [sessionsPage, fetchSessions, recordId]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (
+        el.scrollTop <= 10 &&
+        !sessionsLoading &&
+        sessionsLoadedCount < sessionsTotal
+      ) {
+        lastUpdateWasPrependRef.current = true;
+        setSessionsPage((p) => p + 1);
+      }
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [sessionsLoading, sessionsLoadedCount, sessionsTotal, recordId]);
+
   const handleStop = () => {
     if (!streaming) return;
     streamAbortRef.current.aborted = true;
@@ -226,11 +368,21 @@ const Chat: React.FC = () => {
               setStreaming(false);
               assistantIdRef.current = null;
               setRecordId(null);
+              setSessionsPage(1);
+              setSessionsTotal(0);
+              setSessionsLoadedCount(0);
             }}
           >
             新对话 +
           </Button>
           <Space>
+            <Button
+              onClick={() => {
+                setHistoryVisible(true);
+              }}
+            >
+              历史
+            </Button>
             <Input.Search
               value={query}
               allowClear
@@ -271,7 +423,7 @@ const Chat: React.FC = () => {
                     ) : (
                       <Avatar size={20} style={{ flexShrink: 0 }}>
                         <img
-                          src="/agentlz-robot.jpg"
+                          src="/agentlz-logo.png"
                           alt={a.name}
                           style={{
                             width: "100%",
@@ -307,7 +459,7 @@ const Chat: React.FC = () => {
               ) : (
                 <Avatar size={28} style={{ flexShrink: 0 }}>
                   <img
-                    src="/agentlz-robot.jpg"
+                    src="/agentlz-logo.png"
                     alt={currentAgent.name}
                     style={{
                       width: "100%",
@@ -340,6 +492,7 @@ const Chat: React.FC = () => {
             display: "flex",
             flexDirection: "column",
             flex: 1,
+            height: "30vh",
           }}
         >
           <div
@@ -354,6 +507,12 @@ const Chat: React.FC = () => {
               rowGap: 16,
             }}
           >
+            {sessionsLoading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Spin size={16} />
+                <span>加载历史会话</span>
+              </div>
+            )}
             {messages.map((m) => (
               <div
                 key={m.id}
@@ -372,11 +531,20 @@ const Chat: React.FC = () => {
                   }}
                 >
                   {m.role === "user" ? (
-                    <Avatar
-                      size={28}
-                      style={{ backgroundColor: "#165DFF", flexShrink: 0 }}
-                    >
-                      <IconUser />
+                    <Avatar size={28} style={{ flexShrink: 0 }}>
+                      {userAvatar ? (
+                        <img
+                          src={userAvatar}
+                          alt={identity?.fullName || identity?.username || "me"}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <IconUser />
+                      )}
                     </Avatar>
                   ) : (
                     <Avatar size={28} style={{ flexShrink: 0 }}>
@@ -498,6 +666,20 @@ const Chat: React.FC = () => {
             </Card>
           </div>
         </div>
+        <HistoryDrawer
+          visible={historyVisible}
+          agentId={agentId}
+          userId={String(identity?.id ?? "")}
+          onClose={() => setHistoryVisible(false)}
+          onPick={(rid) => {
+            if (!Number.isNaN(rid)) {
+              setMessages([]);
+              setSteps([]);
+              setRecordId(rid);
+            }
+            setHistoryVisible(false);
+          }}
+        />
       </div>
     </div>
   );

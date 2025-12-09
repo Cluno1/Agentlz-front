@@ -126,3 +126,51 @@ export interface AgentChatStreamChunk {
   done?: boolean;
   [k: string]: any;
 }
+export interface AgentChatHistoryInput {
+  agent_id?: number;
+  api_name?: string;
+  api_key?: string;
+  meta?: Record<string, any> | null;
+  page?: number;
+  per_page?: number;
+  keyword?: string | null;
+  [k: string]: any;
+}
+export interface AgentChatRecord {
+  id?: number;
+  record_id?: number;
+  name?: string | null;
+  summary?: string | null;
+  content?: string | null;
+  message?: string | null;
+  meta?: Record<string, any> | null;
+  created_at?: string;
+  updated_at?: string;
+  [k: string]: any;
+}
+export interface AgentChatSessionInput {
+  agent_id?: number;
+  api_name?: string;
+  api_key?: string;
+  meta?: Record<string, any> | null;
+  record_id: number;
+  page?: number;
+  per_page?: number;
+  [k: string]: any;
+}
+export interface AgentChatSession {
+  id?: number;
+  record_id?: number;
+  role?: "user" | "assistant" | "system";
+  content?: string | null;
+  message?: string | null;
+  input?: string | null;
+  output?: string | null;
+  count?: number | null;
+  zip?: string | null;
+  time?: string | null;
+  meta?: Record<string, any> | null;
+  created_at?: string;
+  updated_at?: string;
+  [k: string]: any;
+}

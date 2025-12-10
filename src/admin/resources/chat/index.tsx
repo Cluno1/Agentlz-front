@@ -399,6 +399,8 @@ const Chat: React.FC = () => {
         style={{
           display: "flex",
           alignItems: "center",
+          gap: 12,
+          marginBottom: 12,
           justifyContent: "space-between",
         }}
       >
@@ -598,6 +600,7 @@ const Chat: React.FC = () => {
         >
           <div
             ref={listRef}
+            className="hide-scrollbar"
             style={{
               flex: 1,
               height: "60vh",
@@ -660,66 +663,70 @@ const Chat: React.FC = () => {
                       />
                     </Avatar>
                   )}
-                  <div
-                    onMouseEnter={() => setHoveredMsgId(m.id)}
-                    onMouseLeave={() =>
-                      setHoveredMsgId((id) => (id === m.id ? null : id))
-                    }
-                    style={{
-                      position: "relative",
-                      borderRadius: 16,
-                      border:
-                        m.role === "assistant"
-                          ? "1px solid #d1d5db"
-                          : undefined,
-                      padding: "8px 12px",
-                      paddingRight: m.role === "assistant" ? 36 : undefined,
-                      fontSize: 14,
-                      lineHeight: 1.6,
-                      backgroundColor:
-                        m.role === "user" ? "rgb(22,93,255)" : undefined,
-                      color: m.role === "user" ? "#fff" : undefined,
-                    }}
-                  >
-                    {m.role === "assistant" ? (
+                  {m.role === "assistant" ? (
+                    <div
+                      onMouseEnter={() => setHoveredMsgId(m.id)}
+                      onMouseLeave={() =>
+                        setHoveredMsgId((id) => (id === m.id ? null : id))
+                      }
+                      style={{
+                        position: "relative",
+                        borderRadius: 16,
+                        border: undefined,
+                        padding: 0,
+                        paddingRight: 36,
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                      }}
+                    >
                       <ReactMarkdown>{m.content}</ReactMarkdown>
-                    ) : (
-                      m.content
-                    )}
-                    {m.role === "assistant" && hoveredMsgId === m.id && (
+                      {hoveredMsgId === m.id && (
+                        <div
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(m.content);
+                              Message.success({
+                                content: "复制成功",
+                                duration: 1500,
+                              });
+                            } catch {
+                              Message.error({
+                                content: "复制失败",
+                                duration: 1500,
+                              });
+                            }
+                          }}
+                          title="复制"
+                          style={{
+                            position: "absolute",
+                            right: 8,
+                            top: 8,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            color: "#9CA3AF",
+                            background: "transparent",
+                          }}
+                        >
+                          <IconCopy />
+                          <span style={{ fontSize: 12 }}>复制</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Card size="small" style={{ borderRadius: 16 }}>
                       <div
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(m.content);
-                            Message.success({
-                              content: "复制成功",
-                              duration: 1500,
-                            });
-                          } catch {
-                            Message.error({
-                              content: "复制失败",
-                              duration: 1500,
-                            });
-                          }
-                        }}
-                        title="复制"
                         style={{
-                          position: "absolute",
-                          right: 8,
-                          top: 8,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          color: "#9CA3AF",
-                          background: "transparent",
+                          padding: "2px 12px",
+                          fontSize: 14,
+                          lineHeight: 1.6,
                         }}
                       >
-                        <IconCopy />
-                        <span style={{ fontSize: 12 }}>复制</span>
+                        {m.content}
                       </div>
-                    )}
-                  </div>
+                    </Card>
+                  )}
                 </div>
               </div>
             ))}

@@ -14,6 +14,7 @@ type Props = {
   visible: boolean;
   agentId: string;
   userId: string;
+  currentRecordId?: number | null;
   onClose: () => void;
   onPick: (recordId: number) => void;
 };
@@ -22,16 +23,28 @@ const HistoryDrawer: React.FC<Props> = ({
   visible,
   agentId,
   userId,
+  currentRecordId,
   onClose,
   onPick,
 }) => {
+  /** 列表加载中状态 */
   const [loading, setLoading] = useState(false);
+  /** 历史记录数据列表 */
   const [rows, setRows] = useState<AgentChatRecord[]>([]);
+  /** 分页当前页码 */
   const [page, setPage] = useState(1);
+  /** 分页每页数量 */
   const [perPage] = useState(15);
+  /** 历史记录总数 */
   const [total, setTotal] = useState(0);
+  /** 关键词搜索 */
   const [keyword, setKeyword] = useState("");
+  /** 底部哨兵元素，用于 IntersectionObserver 触发翻页 */
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  /** 首次加载完成标记（避免 StrictMode 重复加载） */
+  const initialLoadDoneRef = useRef(false);
+  /** 请求互斥锁，避免并发重复请求 */
+  const historyFetchLockRef = useRef(false);
 
   const fetchList = useCallback(async () => {
     if (!agentId) return;
@@ -59,13 +72,26 @@ const HistoryDrawer: React.FC<Props> = ({
 
   useEffect(() => {
     if (!visible) return;
-    fetchList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPage(1);
+    setRows([]);
+    setTotal(0);
+    initialLoadDoneRef.current = false;
   }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
-    fetchList();
+    if (historyFetchLockRef.current) return;
+    if (page === 1 && initialLoadDoneRef.current) return;
+    const run = async () => {
+      try {
+        historyFetchLockRef.current = true;
+        await fetchList();
+        if (page === 1) initialLoadDoneRef.current = true;
+      } finally {
+        historyFetchLockRef.current = false;
+      }
+    };
+    run();
   }, [page, visible, fetchList]);
 
   useEffect(() => {
@@ -93,7 +119,7 @@ const HistoryDrawer: React.FC<Props> = ({
   const handleSearch = () => {
     setPage(1);
     setRows([]);
-    fetchList();
+    initialLoadDoneRef.current = false;
   };
 
   return (
@@ -135,15 +161,26 @@ const HistoryDrawer: React.FC<Props> = ({
             ? new Date(h.created_at).toLocaleString()
             : "";
           const name = h.name || "";
+          const rid = Number(h.record_id ?? h.id);
+          const isCurrent =
+            !Number.isNaN(rid) &&
+            currentRecordId != null &&
+            rid === currentRecordId;
           return (
             <Card
               key={String(h.id ?? h.record_id ?? Math.random())}
               hoverable
               onClick={() => {
-                const rid = Number(h.record_id ?? h.id);
-                if (!Number.isNaN(rid)) onPick(rid);
+                const rid2 = Number(h.record_id ?? h.id);
+                if (!Number.isNaN(rid2)) onPick(rid2);
               }}
-              style={{ cursor: "pointer" }}
+              style={{
+                cursor: "pointer",
+                border: isCurrent ? "1px solid #165DFF" : undefined,
+                boxShadow: isCurrent
+                  ? "0 0 0 2px rgba(22,93,255,0.2)"
+                  : undefined,
+              }}
             >
               <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>
                 {time}

@@ -253,38 +253,35 @@ export async function* chatAgentStream(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
+    const events = buffer.split(/\r?\n\r?\n/);
     buffer = events.pop() || "";
     for (const evt of events) {
-      const line = evt
-        .split("\n")
-        .find((l) => l.startsWith("data:"))
-        ?.replace(/^data:\s*/, "");
-      if (!line) continue;
-      if (line.trim() === "[DONE]") {
+      const dataLines = evt
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.replace(/^data:(?: )?/, ""));
+      if (dataLines.length === 0) continue;
+      const raw = dataLines.join("\n");
+      const fixed = raw.replace(
+        /(^|\n)(#{1,6})\n\s+([^\n]+)/g,
+        (_m, p, h, r) => (p ? "\n" : "") + h + " " + r,
+      );
+      const trimmedForControl = raw.trim();
+      if (trimmedForControl === "[DONE]") {
         yield { done: true };
         return;
       }
-      const trimmed = line.trim();
       let parsed: any = undefined;
-      // 仅当看起来是对象/数组时尝试 JSON 解析
-      const looksLikeJsonObject =
-        trimmed.startsWith("{") || trimmed.startsWith("[");
+      const looksLikeJsonObject = /^\s*\{/.test(raw) || /^\s*\[/.test(raw);
       if (looksLikeJsonObject) {
         try {
-          parsed = JSON.parse(trimmed);
+          parsed = JSON.parse(trimmedForControl);
         } catch {
           parsed = undefined;
         }
-      } else {
-        // 非对象/数组（例如数字、纯文本）直接作为 delta 输出
-        yield { delta: trimmed };
-        continue;
       }
 
-      // 如果解析得到的是对象，并且包含已知字段，则直接透传
       if (parsed && typeof parsed === "object") {
-        // 兼容形如 { record_id: 7 } 或 { delta: "..." } 的事件
         if (
           "delta" in parsed ||
           "text" in parsed ||
@@ -296,13 +293,7 @@ export async function* chatAgentStream(
         }
       }
 
-      // 其余情况，作为文本 token 处理
-      yield {
-        delta:
-          typeof parsed !== "object" && parsed != null
-            ? String(parsed)
-            : trimmed,
-      };
+      yield { delta: fixed };
     }
   }
   yield { done: true };

@@ -11,8 +11,9 @@ import {
   Space,
   Spin,
   Tag,
+  Empty,
 } from "@arco-design/web-react";
-import { IconUser, IconCopy } from "@arco-design/web-react/icon";
+import { IconUser, IconCopy, IconSearch } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
 import { chatAgentStream, listAgentChatSessions } from "../../data/api/agent";
@@ -37,10 +38,14 @@ const Chat: React.FC = () => {
   const { identity } = useGetIdentity();
   /** 可选助手列表 */
   const [agents, setAgents] = useState<AgentInfo[]>([]);
+  /** 助手列表加载中 */
+  const [agentsLoading, setAgentsLoading] = useState(false);
   /** 当前选中的助手ID */
   const [agentId, setAgentId] = useState<string>("");
   /** 顶部搜索框的关键词 */
   const [query, setQuery] = useState<string>("");
+  /** 助手选择下拉是否打开 */
+  const [selectOpen, setSelectOpen] = useState(false);
   /** 当前对话消息列表（包含用户和助手） */
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   /** 输入框内容 */
@@ -103,6 +108,7 @@ const Chat: React.FC = () => {
   const fetchAgents = React.useCallback(
     async (q: string) => {
       try {
+        setAgentsLoading(true);
         const resp = await listAccessibleAgents({
           page: 1,
           perPage: 50,
@@ -119,6 +125,8 @@ const Chat: React.FC = () => {
         setAgents(mapped);
       } catch {
         Message.error(t("agent.msg.loadAgentsFail", { _: "加载失败" }));
+      } finally {
+        setAgentsLoading(false);
       }
     },
     [t],
@@ -128,11 +136,11 @@ const Chat: React.FC = () => {
     fetchAgents("");
   }, [fetchAgents]);
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      fetchAgents(query.trim());
-    }, 300);
-    return () => clearTimeout(id);
+  // 搜索仅在用户点击按钮或按下回车时触发
+  const runAgentSearch = React.useCallback(() => {
+    const q = query.trim();
+    fetchAgents(q);
+    setSelectOpen(true);
   }, [query, fetchAgents]);
 
   useEffect(() => {
@@ -423,20 +431,25 @@ const Chat: React.FC = () => {
         </Button>
         <Space>
           <Input.Search
-            value={query}
             allowClear
             placeholder={t("agent.ui.searchPlaceholder", {
               _: "搜索助手名称",
             })}
             onChange={setQuery}
-            onSearch={(v) => setQuery(v)}
-            style={{ width: 240 }}
+            onSearch={runAgentSearch}
+            onPressEnter={runAgentSearch}
+            style={{ width: 180 }}
+            searchButton={<IconSearch />}
           />
+
           <Select
             value={agentId}
             placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
             onChange={setAgentId}
-            style={{ width: 192 }}
+            style={{ width: 220 }}
+            popupVisible={selectOpen}
+            onVisibleChange={setSelectOpen}
+            loading={agentsLoading}
           >
             {agents.map((a) => (
               <Select.Option key={a.id} value={a.id}>
@@ -477,8 +490,15 @@ const Chat: React.FC = () => {
               </Select.Option>
             ))}
           </Select>
+          {agentsLoading && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Spin size={16} />
+              <span>搜索中</span>
+            </div>
+          )}
         </Space>
         <Button
+          disabled={agentsLoading || agents.length === 0}
           onClick={() => {
             setHistoryVisible(true);
           }}
@@ -588,6 +608,11 @@ const Chat: React.FC = () => {
         }}
       >
         {tabbarComponent}
+        {!agentsLoading && agents.length === 0 && (
+          <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
+            <Empty description={t("agent.ui.emptyAgents", { _: "暂无助手" })} />
+          </Card>
+        )}
         <div
           style={{
             boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",

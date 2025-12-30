@@ -27,11 +27,13 @@ import enUS from "@arco-design/web-react/es/locale/en-US";
 import Chat from "./resources/chat";
 import Agent from "./resources/agent";
 import CreateAgent from "./resources/agent/CreateAgent";
-import McpToolsPage from "./resources/tools/McpToolsPage";
+import McpToolsPage from "./resources/mcp/McpToolsPage";
 import RagPage from "./resources/rag/RagPage";
 import CreatePage from "./resources/create/CreatePage";
 import RagUploadPage from "./resources/rag/RagUploadPage";
 import RagShow from "./resources/rag/RagShow";
+import McpCreatePage from "./resources/mcp/McpCreatePage";
+import McpShow from "./resources/mcp/McpShow";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -154,6 +156,14 @@ export const App = () => (
         </ArcoLocaleBridge>
       }
     />
+    <Resource
+      name="mcp"
+      show={
+        <ArcoLocaleBridge>
+          <McpShow />
+        </ArcoLocaleBridge>
+      }
+    />
 
     {/* 公开路由：注册页（不需要认证） */}
 
@@ -172,6 +182,14 @@ export const App = () => (
         element={
           <ArcoLocaleBridge>
             <CreateAgent />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Route
+        path="/mcp/create"
+        element={
+          <ArcoLocaleBridge>
+            <McpCreatePage />
           </ArcoLocaleBridge>
         }
       />

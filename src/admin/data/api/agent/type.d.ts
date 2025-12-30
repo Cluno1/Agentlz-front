@@ -32,7 +32,9 @@ export namespace ListAgentsNameSpace {
     description?: string | null;
     disabled?: boolean;
     mcp_agent_ids?: number[];
+    mcp_agents?: Array<{ id: number; name: string }>;
     document_ids?: string[];
+    documents?: Array<{ id: string; name: string }>;
     tenant_id?: string;
     created_at?: string;
     created_by_id?: string | number;

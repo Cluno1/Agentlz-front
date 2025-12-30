@@ -154,7 +154,7 @@ export default {
         name: "名称",
         description: "描述",
         disabled: "停用",
-        mcpIds: "MCP ID",
+        mcpIds: "MCP 数量",
         docCount: "文档数量",
         tenant: "租户",
         createdAt: "创建时间",

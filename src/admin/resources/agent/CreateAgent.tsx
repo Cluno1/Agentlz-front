@@ -20,6 +20,8 @@ import { useDarkMode } from "../../data/hook/useDark";
 import { listDocuments } from "../../data/api/rag";
 import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
 import { createAgent } from "../../data/api/agent";
+import { listMcps } from "../../data/api/mcp";
+import type { ListMcpNameSpace } from "../../data/api/mcp/type";
 
 const CreateAgent: React.FC = () => {
   const t = useTranslate();
@@ -36,6 +38,15 @@ const CreateAgent: React.FC = () => {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [mcpItems, setMcpItems] = useState<ListMcpNameSpace.ListMcpResult[]>(
+    [],
+  );
+  const [mcpLoading, setMcpLoading] = useState<boolean>(false);
+  const [selectedMcpIds, setSelectedMcpIds] = useState<number[]>([]);
+  const [mcpQuery, setMcpQuery] = useState<string>("");
+  const [mcpScope, setMcpScope] = useState<"self" | "tenant" | "system">(
+    "self",
+  );
 
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
@@ -67,6 +78,28 @@ const CreateAgent: React.FC = () => {
     };
     void run();
   }, [t, scope]);
+
+  useEffect(() => {
+    const run = async () => {
+      setMcpLoading(true);
+      try {
+        const { data } = await listMcps({
+          page: 1,
+          perPage: 10,
+          sortField: "id",
+          sortOrder: "DESC",
+          filter: { q: mcpQuery },
+          type: mcpScope,
+        });
+        setMcpItems(data || []);
+      } catch {
+        Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
+      } finally {
+        setMcpLoading(false);
+      }
+    };
+    void run();
+  }, [t, mcpScope, mcpQuery]);
 
   const fetchRagDocs = async () => {
     setRagLoading(true);
@@ -102,6 +135,21 @@ const CreateAgent: React.FC = () => {
     return `${selectedDocIds.length}`;
   }, [selectedDocIds, t]);
 
+  const toggleSelectMcp = (id?: number) => {
+    if (!id && id !== 0) return;
+    setSelectedMcpIds((prev) => {
+      const exists = prev.includes(Number(id));
+      if (exists) return prev.filter((d) => d !== Number(id));
+      return [...prev, Number(id)];
+    });
+  };
+
+  const selectedMcpText = useMemo(() => {
+    if (!selectedMcpIds.length)
+      return t("rag.ui.selected.none", { _: "未选择" });
+    return `${selectedMcpIds.length}`;
+  }, [selectedMcpIds, t]);
+
   const handleCreate = async () => {
     try {
       const values = await form.validate();
@@ -110,7 +158,7 @@ const CreateAgent: React.FC = () => {
         name: values.name,
         description: values.description || undefined,
         document_ids: selectedDocIds.length ? selectedDocIds : undefined,
-        mcp_agent_ids: undefined,
+        mcp_agent_ids: selectedMcpIds.length ? selectedMcpIds : undefined,
       };
       await createAgent(payload, values.type || "self");
       Message.success(t("common.success", { _: "操作成功" }));
@@ -163,6 +211,62 @@ const CreateAgent: React.FC = () => {
             <Button
               type={selected ? "outline" : "primary"}
               onClick={() => toggleSelectDoc(id)}
+            >
+              {selected
+                ? t("rag.ui.columns.unselect", { _: "取消选择" })
+                : t("rag.ui.columns.select", { _: "选择" })}
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
+
+  type McpColumn = {
+    title: React.ReactNode;
+    dataIndex: string;
+    width?: number;
+    render?: (
+      value: unknown,
+      record: ListMcpNameSpace.ListMcpResult,
+    ) => React.ReactNode;
+  };
+
+  const mcpColumns: McpColumn[] = [
+    {
+      title: t("rag.ui.columns.id", { _: "ID" }),
+      dataIndex: "id",
+      width: 120,
+    },
+    {
+      title: t("rag.ui.columns.name", { _: "名称" }),
+      dataIndex: "name",
+      width: 240,
+      render: (v: unknown) => (
+        <span style={{ fontWeight: 500 }}>
+          {typeof v === "string" ? v : String(v ?? "")}
+        </span>
+      ),
+    },
+    {
+      title: t("rag.ui.columns.description", { _: "描述" }),
+      dataIndex: "description",
+      width: 240,
+      render: (v: unknown) =>
+        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+    },
+    {
+      title: t("rag.ui.columns.operations", { _: "操作" }),
+      dataIndex: "operations",
+      width: 160,
+      render: (_: unknown, record: ListMcpNameSpace.ListMcpResult) => {
+        const id = Number(record.id || 0);
+        const selected = selectedMcpIds.includes(id);
+        return (
+          <Space>
+            <Button
+              type={selected ? "outline" : "primary"}
+              onClick={() => toggleSelectMcp(id)}
             >
               {selected
                 ? t("rag.ui.columns.unselect", { _: "取消选择" })
@@ -326,10 +430,65 @@ const CreateAgent: React.FC = () => {
   );
 
   const mcpPreview = (
-    <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
-      <div style={{ padding: 12, fontSize: 14, color: "#6b7280" }}>
-        {t("agent.ui.mcp.empty", { _: "暂无 MCP 数据" })}
+    <Card
+      style={{
+        boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          marginBottom: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Space>
+          <Button.Group>
+            <Button
+              type={mcpScope === "self" ? "primary" : "outline"}
+              onClick={() => setMcpScope("self")}
+            >
+              {t("rag.ui.tabs.self", { _: "个人" })}
+            </Button>
+            {!isDefaultTenant && (
+              <Button
+                type={mcpScope === "tenant" ? "primary" : "outline"}
+                onClick={() => setMcpScope("tenant")}
+              >
+                {t("rag.ui.tabs.tenant", { _: "租户" })}
+              </Button>
+            )}
+            <Button
+              type={mcpScope === "system" ? "primary" : "outline"}
+              onClick={() => setMcpScope("system")}
+            >
+              {t("rag.ui.tabs.system", { _: "系统" })}
+            </Button>
+          </Button.Group>
+          <Tag color="arcoblue">
+            {t("rag.ui.selected.count", { _: "已选择" })}: {selectedMcpText}
+          </Tag>
+        </Space>
+        <Space>
+          <Input
+            allowClear
+            style={{ width: 240 }}
+            placeholder={t("mcpTools.ui.searchPlaceholder", { _: "搜索" })}
+            value={mcpQuery}
+            onChange={setMcpQuery}
+          />
+        </Space>
       </div>
+      <Table
+        loading={mcpLoading}
+        columns={mcpColumns}
+        data={mcpItems}
+        rowKey="id"
+        pagination={false}
+      />
     </Card>
   );
 

@@ -9,6 +9,7 @@ import {
   Create,
   Description,
   Chat,
+  Assessment,
 } from "@mui/icons-material";
 import SubMenu from "../components/SubMenu";
 
@@ -49,6 +50,11 @@ export const Menu = () => {
         to="/create"
         primaryText={translate("menu.create")}
         leftIcon={<Create />}
+      />
+      <RAMenu.Item
+        to="/evaluation"
+        primaryText={translate("menu.evaluation")}
+        leftIcon={<Assessment />}
       />
       {permissions === "admin" && (
         <SubMenu

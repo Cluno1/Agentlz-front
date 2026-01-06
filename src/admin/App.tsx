@@ -34,6 +34,7 @@ import RagUploadPage from "./resources/rag/RagUploadPage";
 import RagShow from "./resources/rag/RagShow";
 import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
+import Evaluation from "./resources/evaluation";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -131,6 +132,15 @@ export const App = () => (
       list={
         <ArcoLocaleBridge>
           <Agent />
+        </ArcoLocaleBridge>
+      }
+    />
+
+    <Resource
+      name="evaluation"
+      list={
+        <ArcoLocaleBridge>
+          <Evaluation />
         </ArcoLocaleBridge>
       }
     />

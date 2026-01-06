@@ -30,11 +30,13 @@ export namespace ListAgentsNameSpace {
     id?: number;
     name?: string;
     description?: string | null;
+    system_prompt?: string | null;
     disabled?: boolean;
     mcp_agent_ids?: number[];
     mcp_agents?: Array<{ id: number; name: string }>;
     document_ids?: string[];
     documents?: Array<{ id: string; name: string }>;
+    meta?: Record<string, any> | null;
     tenant_id?: string;
     created_at?: string;
     created_by_id?: string | number;
@@ -57,6 +59,8 @@ export namespace CreateAgentNameSpace {
   export interface CreateAgentParams {
     name: string;
     description?: string;
+    system_prompt?: string;
+    meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
     document_ids?: string[];
@@ -75,6 +79,8 @@ export namespace UpdateAgentNameSpace {
   export interface UpdateAgentParams {
     name?: string;
     description?: string;
+    system_prompt?: string;
+    meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
     document_ids?: string[];

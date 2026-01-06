@@ -6,6 +6,8 @@ export default {
     success: "操作成功",
     error: "操作失败",
     reload: "重新加载",
+    yes: "是",
+    no: "否",
   },
   menu: {
     profile: "个人资料",
@@ -19,6 +21,7 @@ export default {
     mcpTools: "mcp工具",
     rag: "知识库文档",
     create: "创造",
+    evaluation: "评测",
   },
   profile: {
     title: "个人资料",
@@ -288,5 +291,29 @@ export default {
   create: {
     title: "创造",
     placeholder: "这里是创造页面的占位内容。",
+  },
+  evaluation: {
+    title: "智能体评测",
+    tabs: {
+      observe: "观测",
+      evaluate: "评测",
+    },
+    ui: {
+      questionCol: "问题列",
+      answerCol: "答案列",
+      start: "开始评测",
+      accuracy: "准确率",
+      avgTime: "平均用时",
+      columns: {
+        question: "问题",
+        expected: "期望答案",
+        answer: "生成答案",
+        time: "用时(ms)",
+        correct: "是否正确",
+      },
+    },
+    msg: {
+      xlsxUnsupported: "暂不支持xlsx解析，请使用CSV",
+    },
   },
 };

@@ -6,8 +6,35 @@ export default {
     success: "Success",
     error: "Error",
     reload: "Reload",
+    yes: "Yes",
+    no: "No",
+  },
+  evaluation: {
+    title: "Agent Evaluation",
+    tabs: {
+      observe: "Observation",
+      evaluate: "Evaluation",
+    },
+    ui: {
+      questionCol: "Question Column",
+      answerCol: "Answer Column",
+      start: "Start Evaluation",
+      accuracy: "Accuracy",
+      avgTime: "Average Time",
+      columns: {
+        question: "Question",
+        expected: "Expected",
+        answer: "Answer",
+        time: "Time (ms)",
+        correct: "Correct",
+      },
+    },
+    msg: {
+      xlsxUnsupported: "xlsx parsing is not supported, please use CSV",
+    },
   },
   menu: {
+    evaluation: "Evaluation",
     profile: "Profile",
     logout: "Logout",
     dashboard: "Dashboard",

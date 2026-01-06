@@ -1,33 +1,27 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Title, useTranslate } from "react-admin";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useTranslate } from "react-admin";
 import {
   Card,
   Button,
   Input,
-  Message,
   Space,
   Table,
   Tag,
   Form,
   Radio,
+  Avatar,
 } from "@arco-design/web-react";
-import { useDarkMode } from "../../data/hook/useDark";
-import { listDocuments } from "../../data/api/rag";
-import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
-import { createAgent } from "../../data/api/agent";
-import { listMcps } from "../../data/api/mcp";
-import type { ListMcpNameSpace } from "../../data/api/mcp/type";
+import { IconUser } from "@arco-design/web-react/icon";
+import { listDocuments } from "../../../data/api/rag";
+import type { ListRagDocsNameSpace } from "../../../data/api/rag/type";
+import { listMcps } from "../../../data/api/mcp";
+import type { ListMcpNameSpace } from "../../../data/api/mcp/type";
 
-const CreateAgent: React.FC = () => {
+const Observation: React.FC = () => {
   const t = useTranslate();
-  const navigate = useNavigate();
-  const { cardColorStyle } = useDarkMode();
   const [active, setActive] = useState<"base" | "rag" | "mcp">("base");
   const [form] = Form.useForm();
-  const promptFileRef = useRef<HTMLInputElement | null>(null);
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [baseMessage, setBaseMessage] = useState<string>("");
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
     [],
   );
@@ -51,8 +45,7 @@ const CreateAgent: React.FC = () => {
 
   useEffect(() => {
     if (isDefaultTenant && scope === "tenant") setScope("self");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isDefaultTenant, scope]);
 
   useEffect(() => {
     const run = async () => {
@@ -68,13 +61,13 @@ const CreateAgent: React.FC = () => {
         });
         setDocs(resp.data || []);
       } catch {
-        Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
+        void 0;
       } finally {
         setRagLoading(false);
       }
     };
     void run();
-  }, [t, scope]);
+  }, [scope]);
 
   useEffect(() => {
     const run = async () => {
@@ -90,13 +83,13 @@ const CreateAgent: React.FC = () => {
         });
         setMcpItems(data || []);
       } catch {
-        Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
+        void 0;
       } finally {
         setMcpLoading(false);
       }
     };
     void run();
-  }, [t, mcpScope, mcpQuery]);
+  }, [mcpScope, mcpQuery]);
 
   const fetchRagDocs = async () => {
     setRagLoading(true);
@@ -111,7 +104,7 @@ const CreateAgent: React.FC = () => {
       });
       setDocs(resp.data || []);
     } catch {
-      Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
+      void 0;
     } finally {
       setRagLoading(false);
     }
@@ -133,11 +126,11 @@ const CreateAgent: React.FC = () => {
   }, [selectedDocIds, t]);
 
   const toggleSelectMcp = (id?: number) => {
-    if (!id && id !== 0) return;
+    if (typeof id !== "number") return;
     setSelectedMcpIds((prev) => {
-      const exists = prev.includes(Number(id));
-      if (exists) return prev.filter((d) => d !== Number(id));
-      return [...prev, Number(id)];
+      const exists = prev.includes(id);
+      if (exists) return prev.filter((d) => d !== id);
+      return [...prev, id];
     });
   };
 
@@ -146,31 +139,6 @@ const CreateAgent: React.FC = () => {
       return t("rag.ui.selected.none", { _: "未选择" });
     return `${selectedMcpIds.length}`;
   }, [selectedMcpIds, t]);
-
-  const handleCreate = async () => {
-    try {
-      const values = await form.validate();
-      setSubmitting(true);
-      const payload = {
-        name: values.name,
-        description: values.description || undefined,
-        system_prompt: values.system_prompt || undefined,
-        document_ids: selectedDocIds.length ? selectedDocIds : undefined,
-        mcp_agent_ids: selectedMcpIds.length ? selectedMcpIds : undefined,
-      };
-      console.log(values.toLocaleString(), "form values");
-      await createAgent(payload, values.type || "self");
-      Message.success(t("common.success", { _: "操作成功" }));
-      navigate("/agent");
-    } catch (e) {
-      const msg =
-        (e as { message?: string })?.message ||
-        t("common.error", { _: "操作失败" });
-      Message.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   type RagColumn = {
     title: React.ReactNode;
@@ -192,7 +160,7 @@ const CreateAgent: React.FC = () => {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "title",
       width: 240,
-      render: (v: unknown, _rec: ListRagDocsNameSpace.ListRagDocsResult) => (
+      render: (v: unknown) => (
         <span style={{ fontWeight: 500 }}>
           {typeof v === "string" ? v : String(v ?? "")}
         </span>
@@ -276,6 +244,90 @@ const CreateAgent: React.FC = () => {
       },
     },
   ];
+
+  const previewHeader = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Avatar size={28}>
+        <img src="/agentlz-robot.jpg" alt="agent" />
+      </Avatar>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 500 }}>
+          {form.getFieldValue("name") || t("agent.ui.new", { _: "新智能体" })}
+        </div>
+        <div style={{ fontSize: 12, color: "#6b7280" }}>
+          {form.getFieldValue("description") || ""}
+        </div>
+      </div>
+    </div>
+  );
+
+  const basePreview = (
+    <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
+      {previewHeader}
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          flexDirection: "column",
+          rowGap: 12,
+        }}
+      >
+        {baseMessage && (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                maxWidth: "80%",
+                alignItems: "flex-start",
+                gap: 8,
+                flexDirection: "row-reverse",
+              }}
+            >
+              <Avatar size={28} style={{ backgroundColor: "#165DFF" }}>
+                <IconUser />
+              </Avatar>
+              <div
+                style={{
+                  borderRadius: 16,
+                  padding: "8px 12px",
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  backgroundColor: "rgb(22,93,255)",
+                  color: "#fff",
+                }}
+              >
+                {baseMessage}
+              </div>
+            </div>
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+          <div
+            style={{
+              display: "flex",
+              maxWidth: "80%",
+              alignItems: "flex-start",
+              gap: 8,
+            }}
+          >
+            <Avatar size={28}>
+              <img src="/agentlz-robot.jpg" alt="assistant" />
+            </Avatar>
+            <div
+              style={{
+                borderRadius: 16,
+                padding: "8px 12px",
+                fontSize: 14,
+                lineHeight: 1.6,
+              }}
+            >
+              {t("agent.ui.preview.reply", { _: "这是预览回复" })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
 
   const ragPreview = (
     <Card
@@ -408,163 +460,93 @@ const CreateAgent: React.FC = () => {
   );
 
   return (
-    <div style={{ paddingTop: "30px" }}>
+    <div style={{ display: "flex", gap: 16 }}>
       <div
         style={{
+          width: 360,
           display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 12,
+          flexDirection: "column",
+          rowGap: 12,
         }}
       >
-        <Space />
-        <Space>
-          <Button onClick={() => navigate("/agent")}>
-            {t("common.back", { _: "返回" })}
-          </Button>
-          <Button type="primary" onClick={handleCreate} loading={submitting}>
-            {t("agent.ui.create", { _: "创建智能体" })}
-          </Button>
-        </Space>
-      </div>
-      <Card
-        title={<Title title={t("agent.create.title", { _: "创建智能体" })} />}
-        bordered
-        style={{ ...cardColorStyle }}
-      >
-        <div style={{ display: "flex", gap: 16 }}>
+        <Card
+          hoverable
+          onClick={() => setActive("base")}
+          style={{ borderColor: active === "base" ? "#165DFF" : undefined }}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item
+              label={t("agent.ui.columns.name", { _: "名称" })}
+              field="name"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label={t("agent.ui.columns.description", { _: "描述" })}
+              field="description"
+            >
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item
+              label={t("agent.ui.columns.type", { _: "类型" })}
+              field="type"
+              initialValue="self"
+            >
+              <Radio.Group>
+                <Radio value="self">
+                  {t("rag.ui.tabs.self", { _: "个人" })}
+                </Radio>
+                {!isDefaultTenant && (
+                  <Radio value="tenant">
+                    {t("rag.ui.tabs.tenant", { _: "租户" })}
+                  </Radio>
+                )}
+              </Radio.Group>
+            </Form.Item>
+            <Form.Item label={t("agent.ui.baseMessage", { _: "基础消息" })}>
+              <Input.TextArea
+                rows={4}
+                value={baseMessage}
+                onChange={setBaseMessage}
+                placeholder={t("agent.ui.placeholder", { _: "请输入消息" })}
+              />
+            </Form.Item>
+          </Form>
+        </Card>
+        <Card
+          hoverable
+          onClick={() => setActive("rag")}
+          style={{ borderColor: active === "rag" ? "#165DFF" : undefined }}
+        >
           <div
             style={{
-              width: 360,
               display: "flex",
-              flexDirection: "column",
-              rowGap: 12,
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            <Card
-              hoverable
-              onClick={() => setActive("base")}
-              style={{ borderColor: active === "base" ? "#165DFF" : undefined }}
-            >
-              <Form form={form} layout="vertical">
-                <Form.Item
-                  label={t("agent.ui.columns.name", { _: "名称" })}
-                  field="name"
-                  rules={[{ required: true }]}
-                >
-                  <Input />
-                </Form.Item>
-                <Form.Item
-                  label={t("agent.ui.columns.description", { _: "描述" })}
-                  field="description"
-                >
-                  <Input.TextArea rows={3} />
-                </Form.Item>
-                <Form.Item
-                  label={t("agent.ui.systemPrompt", { _: "系统 Prompt" })}
-                  field="system_prompt"
-                >
-                  <Input.TextArea
-                    rows={8}
-                    placeholder={t("agent.ui.systemPromptPlaceholder", {
-                      _: "编写系统提示词（可粘贴或从文件填充）",
-                    })}
-                    style={{ border: "1px solid #e5e7eb", borderRadius: 8 }}
-                  />
-                </Form.Item>
-                <div>
-                  <Button
-                    type="outline"
-                    onClick={() => promptFileRef.current?.click()}
-                    style={{ marginRight: 8 }}
-                  >
-                    {t("agent.ui.uploadPrompt", { _: "从文件填充" })}
-                  </Button>
-                  <input
-                    ref={promptFileRef}
-                    type="file"
-                    accept=".txt,.md,.json"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const text = String(reader.result || "");
-                        form.setFieldsValue({ system_prompt: text });
-                      };
-                      reader.readAsText(file);
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                </div>
-                <Form.Item
-                  label={t("agent.ui.columns.type", { _: "类型" })}
-                  field="type"
-                  initialValue="self"
-                >
-                  <Radio.Group>
-                    <Radio value="self">
-                      {t("rag.ui.tabs.self", { _: "个人" })}
-                    </Radio>
-                    {!isDefaultTenant && (
-                      <Radio value="tenant">
-                        {t("rag.ui.tabs.tenant", { _: "租户" })}
-                      </Radio>
-                    )}
-                  </Radio.Group>
-                </Form.Item>
-              </Form>
-            </Card>
-            <Card
-              hoverable
-              onClick={() => setActive("rag")}
-              style={{ borderColor: active === "rag" ? "#165DFF" : undefined }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>{t("agent.ui.ragMessage", { _: "RAG 消息" })}</div>
-                <Tag color="arcoblue">
-                  {t("rag.ui.selected.count", { _: "已选择" })}:{" "}
-                  {selectedDocsText}
-                </Tag>
-              </div>
-            </Card>
-            <Card
-              hoverable
-              onClick={() => setActive("mcp")}
-              style={{ borderColor: active === "mcp" ? "#165DFF" : undefined }}
-            >
-              <div>{t("agent.ui.mcpMessage", { _: "MCP 消息" })}</div>
-            </Card>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Space />
-              <Space>
-                <Button onClick={() => navigate("/agent")}>
-                  {t("common.cancel", { _: "取消" })}
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleCreate}
-                  loading={submitting}
-                >
-                  {t("common.confirm", { _: "确认" })}
-                </Button>
-              </Space>
-            </div>
+            <div>{t("agent.ui.ragMessage", { _: "RAG 消息" })}</div>
+            <Tag color="arcoblue">
+              {t("rag.ui.selected.count", { _: "已选择" })}: {selectedDocsText}
+            </Tag>
           </div>
-          <div style={{ flex: 1 }}>
-            {active === "rag" && ragPreview}
-            {active === "mcp" && mcpPreview}
-          </div>
-        </div>
-      </Card>
+        </Card>
+        <Card
+          hoverable
+          onClick={() => setActive("mcp")}
+          style={{ borderColor: active === "mcp" ? "#165DFF" : undefined }}
+        >
+          <div>{t("agent.ui.mcpMessage", { _: "MCP 消息" })}</div>
+        </Card>
+      </div>
+      <div style={{ flex: 1 }}>
+        {active === "base" && basePreview}
+        {active === "rag" && ragPreview}
+        {active === "mcp" && mcpPreview}
+      </div>
     </div>
   );
 };
 
-export default CreateAgent;
+export default Observation;

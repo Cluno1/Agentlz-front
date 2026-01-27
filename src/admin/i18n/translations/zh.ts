@@ -3,6 +3,8 @@ export default {
     loading: "加载中...",
     save: "保存",
     cancel: "取消",
+    back: "返回",
+    confirm: "确认",
     success: "操作成功",
     error: "操作失败",
     reload: "重新加载",
@@ -170,9 +172,22 @@ export default {
         apiKey: "API 密钥",
         type: "类型",
       },
+      systemPrompt: "系统 Prompt",
+      systemPromptPlaceholder: "编写系统提示词（可粘贴或从文件填充）",
+      uploadPrompt: "从文件填充",
       baseMessage: "基础消息",
-      ragMessage: "RAG 消息",
-      mcpMessage: "MCP 消息",
+      ragMessage: "RAG 文档",
+      mcpMessage: "MCP 工具",
+      modelMessage: "模型选择",
+      modelSource: "模型来源",
+      "modelSource.system": "系统模型",
+      "modelSource.openai": "自定义openai模型",
+      "modelSource.custom": "自定义模型",
+      manufacturer: "厂商",
+      tags: "标签",
+      price: "价格",
+      modelDefault: "系统默认",
+      modelSearchPlaceholder: "搜索名称/厂商/标签/描述",
       preview: {
         reply: "这是预览回复",
       },
@@ -194,7 +209,7 @@ export default {
     placeholder: "这里是 mcp 工具页面的占位内容。",
     ui: {
       subtitle: "收录 30,000+ MCP Servers 的全球平台",
-      searchPlaceholder: "搜索工具名称/标签/描述",
+      searchPlaceholder: "按名称搜索",
       categories: {
         all: "全部",
         llm: "LLM",
@@ -291,6 +306,11 @@ export default {
   create: {
     title: "创造",
     placeholder: "这里是创造页面的占位内容。",
+  },
+  model: {
+    msg: {
+      loadFail: "加载失败",
+    },
   },
   evaluation: {
     title: "智能体评测",

@@ -89,6 +89,15 @@ export namespace CreateRagDocNameSpace {
     tags?: string | string[];
     description?: string;
     meta_https?: any;
+    /** @description 文档归属类型（system/self/tenant） */
+    type?: "system" | "self" | "tenant";
+    /**
+     * @description 切片策略数组（字符串或数字形式）
+     * 可接受：
+     * - 字符串：'["0","1"]'、'0,1'、'0 1'
+     * - 数组：['0','1']、[0,1]
+     */
+    strategy?: string | number | Array<string | number>;
     [k: string]: any;
   }
   /** @description 创建文档 返回结果 */
@@ -102,4 +111,45 @@ export namespace CreateRagDocNameSpace {
 export namespace DownloadRagDocNameSpace {
   /** @description 下载文档 返回结果 */
   export type DownloadRagDocResult = string;
+}
+
+/** @description 发布分块解析任务（PUT /rag/{doc_id}/chunk） */
+export namespace PublishChunkNameSpace {
+  /** @description 请求载荷：策略列表（如 [1,2,3]） */
+  export interface ChunkStrategyPayload {
+    strategy: number[];
+    [k: string]: any;
+  }
+  /** @description 返回结果（后端统一 Result 包装，data 字段为发布信息） */
+  export interface PublishChunkResult {
+    [k: string]: any;
+  }
+}
+
+/** @description 列出指定文档的所有切割策略的分块列表（GET /rag/{doc_id}/strategy） */
+export namespace ListDocStrategiesNameSpace {
+  /** @description 单个分块元素 */
+  export interface ChunkItem {
+    index: number;
+    chunk_id?: string;
+    content?: string;
+    created_at?: string;
+    embedding?: number[] | null;
+    [k: string]: any;
+  }
+  /** @description 聚合结构，按策略编号分组（键为策略编号字符串，如 "0","1",...） */
+  export interface StrategyGroup {
+    doc_id: string;
+    tenant_id: string;
+    [strategyKey: string]: any;
+  }
+  /** @description 返回结果：聚合数组 */
+  export type ListDocStrategiesResult = StrategyGroup[];
+}
+
+/** @description 列出指定文档在特定策略下的分块列表（GET /rag/{doc_id}/strategy/{strategy}） */
+export namespace ListStrategyChunksNameSpace {
+  /** @description 返回结构与上方聚合结构一致，通常仅包含单一策略键 */
+  export type ListStrategyChunksResult =
+    ListDocStrategiesNameSpace.StrategyGroup[];
 }

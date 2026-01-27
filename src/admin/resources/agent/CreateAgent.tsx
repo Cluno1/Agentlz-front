@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Title, useTranslate } from "react-admin";
@@ -12,6 +13,7 @@ import {
   Tag,
   Form,
   Radio,
+  Select,
 } from "@arco-design/web-react";
 import { useDarkMode } from "../../data/hook/useDark";
 import { listDocuments } from "../../data/api/rag";
@@ -19,12 +21,16 @@ import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
 import { createAgent } from "../../data/api/agent";
 import { listMcps } from "../../data/api/mcp";
 import type { ListMcpNameSpace } from "../../data/api/mcp/type";
+import { listModels } from "../../data/api/model";
+import type { ListModelsNameSpace } from "../../data/api/model/type";
 
 const CreateAgent: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
   const { cardColorStyle } = useDarkMode();
-  const [active, setActive] = useState<"base" | "rag" | "mcp">("base");
+  const [active, setActive] = useState<"base" | "rag" | "mcp" | "model">(
+    "base",
+  );
   const [form] = Form.useForm();
   const promptFileRef = useRef<HTMLInputElement | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -44,6 +50,18 @@ const CreateAgent: React.FC = () => {
   const [mcpScope, setMcpScope] = useState<"self" | "tenant" | "system">(
     "self",
   );
+  const [modelItems, setModelItems] = useState<
+    ListModelsNameSpace.ListModelsResult[]
+  >([]);
+  const [modelLoading, setModelLoading] = useState<boolean>(false);
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  const [modelSource, setModelSource] = useState<
+    "system" | "openai" | "custom"
+  >("system");
+  const [modelQuery, setModelQuery] = useState<string>("");
+  const [modelPage, setModelPage] = useState<number>(1);
+  const [modelPerPage, setModelPerPage] = useState<number>(10);
+  const [modelTotal, setModelTotal] = useState<number>(0);
 
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
@@ -51,54 +69,19 @@ const CreateAgent: React.FC = () => {
 
   useEffect(() => {
     if (isDefaultTenant && scope === "tenant") setScope("self");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const run = async () => {
-      setRagLoading(true);
-      try {
-        const resp = await listDocuments({
-          page: 1,
-          perPage: 10,
-          sortField: "id",
-          sortOrder: "DESC",
-          filter: { disabled: false, status: "success", title: "" },
-          type: scope,
-        });
-        setDocs(resp.data || []);
-      } catch {
-        Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
-      } finally {
-        setRagLoading(false);
-      }
-    };
-    void run();
-  }, [t, scope]);
+    const timer = setTimeout(() => {
+      void fetchRagDocs({ silent: true });
+      void fetchMcps({ silent: true });
+      if (modelSource === "system")
+        void fetchModels(1, modelPerPage, { silent: true });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
 
-  useEffect(() => {
-    const run = async () => {
-      setMcpLoading(true);
-      try {
-        const { data } = await listMcps({
-          page: 1,
-          perPage: 10,
-          sortField: "id",
-          sortOrder: "DESC",
-          filter: { q: mcpQuery },
-          type: mcpScope,
-        });
-        setMcpItems(data || []);
-      } catch {
-        Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
-      } finally {
-        setMcpLoading(false);
-      }
-    };
-    void run();
-  }, [t, mcpScope, mcpQuery]);
-
-  const fetchRagDocs = async () => {
+  const fetchRagDocs = async (opts?: { silent?: boolean }) => {
     setRagLoading(true);
     try {
       const resp = await listDocuments({
@@ -111,9 +94,59 @@ const CreateAgent: React.FC = () => {
       });
       setDocs(resp.data || []);
     } catch {
-      Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
+      if (!opts?.silent)
+        Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
     } finally {
       setRagLoading(false);
+    }
+  };
+
+  const fetchMcps = async (opts?: { silent?: boolean }) => {
+    setMcpLoading(true);
+    try {
+      const { data } = await listMcps({
+        page: 1,
+        perPage: 10,
+        sortField: "id",
+        sortOrder: "DESC",
+        filter: { q: mcpQuery },
+        type: mcpScope,
+      });
+      setMcpItems(data || []);
+    } catch {
+      if (!opts?.silent)
+        Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
+    } finally {
+      setMcpLoading(false);
+    }
+  };
+
+  const fetchModels = async (
+    pageArg?: number,
+    perPageArg?: number,
+    opts?: { silent?: boolean },
+  ) => {
+    setModelLoading(true);
+    try {
+      const pageNum = typeof pageArg === "number" ? pageArg : modelPage;
+      const perPageNum =
+        typeof perPageArg === "number" ? perPageArg : modelPerPage;
+      const { data, total } = await listModels({
+        page: pageNum,
+        perPage: perPageNum,
+        sortField: "id",
+        sortOrder: "DESC",
+        filter: { q: modelQuery },
+      });
+      setModelItems(data || []);
+      setModelTotal(total || 0);
+      if (typeof pageArg === "number") setModelPage(pageNum);
+      if (typeof perPageArg === "number") setModelPerPage(perPageNum);
+    } catch {
+      if (!opts?.silent)
+        Message.error(t("model.msg.loadFail", { _: "加载失败" }));
+    } finally {
+      setModelLoading(false);
     }
   };
 
@@ -147,18 +180,55 @@ const CreateAgent: React.FC = () => {
     return `${selectedMcpIds.length}`;
   }, [selectedMcpIds, t]);
 
+  const toggleSelectModel = (id?: number) => {
+    if (!id && id !== 0) return;
+    setSelectedModelId((prev) => (prev === Number(id) ? null : Number(id)));
+  };
+
+  const selectedModelText = useMemo(() => {
+    if (modelSource !== "system") {
+      return t("agent.ui.modelDefault", { _: "系统默认" });
+    }
+    if (selectedModelId === null)
+      return t("agent.ui.modelDefault", { _: "系统默认" });
+    const item = modelItems.find(
+      (m) => Number(m.id || 0) === Number(selectedModelId),
+    );
+    return item?.name
+      ? String(item.name)
+      : t("agent.ui.modelDefault", { _: "系统默认" });
+  }, [selectedModelId, modelItems, t, modelSource]);
+
   const handleCreate = async () => {
     try {
       const values = await form.validate();
       setSubmitting(true);
+      const meta: Record<string, unknown> = {};
+      meta.model_source = modelSource;
+      if (modelSource === "system") {
+        if (selectedModelId !== null) {
+          meta.model_id = selectedModelId;
+          const item = modelItems.find(
+            (m) => Number(m.id || 0) === Number(selectedModelId),
+          );
+          if (item?.name) meta.model_name = String(item.name);
+        }
+      } else if (modelSource === "openai") {
+        if (values.openai_api_key) meta.openai_api_key = values.openai_api_key;
+      } else if (modelSource === "custom") {
+        if (values.chatopenai_api_key)
+          meta.chatopenai_api_key = values.chatopenai_api_key;
+        if (values.chatopenai_base_url)
+          meta.chatopenai_base_url = values.chatopenai_base_url;
+      }
       const payload = {
         name: values.name,
         description: values.description || undefined,
         system_prompt: values.system_prompt || undefined,
+        meta: Object.keys(meta).length ? meta : undefined,
         document_ids: selectedDocIds.length ? selectedDocIds : undefined,
         mcp_agent_ids: selectedMcpIds.length ? selectedMcpIds : undefined,
       };
-      console.log(values.toLocaleString(), "form values");
       await createAgent(payload, values.type || "self");
       Message.success(t("common.success", { _: "操作成功" }));
       navigate("/agent");
@@ -266,6 +336,99 @@ const CreateAgent: React.FC = () => {
             <Button
               type={selected ? "outline" : "primary"}
               onClick={() => toggleSelectMcp(id)}
+            >
+              {selected
+                ? t("rag.ui.columns.unselect", { _: "取消选择" })
+                : t("rag.ui.columns.select", { _: "选择" })}
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
+
+  type ModelColumn = {
+    title: React.ReactNode;
+    dataIndex: string;
+    width?: number;
+    render?: (
+      value: unknown,
+      record: ListModelsNameSpace.ListModelsResult,
+    ) => React.ReactNode;
+  };
+
+  const modelColumns: ModelColumn[] = [
+    {
+      title: t("rag.ui.columns.name", { _: "名称" }),
+      dataIndex: "name",
+      width: 240,
+      render: (v: unknown) => (
+        <span style={{ fontWeight: 500 }}>
+          {typeof v === "string" ? v : String(v ?? "")}
+        </span>
+      ),
+    },
+    {
+      title: t("agent.ui.manufacturer", { _: "厂商" }),
+      dataIndex: "manufacturer",
+      width: 120,
+      render: (v: unknown) =>
+        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+    },
+    {
+      title: t("agent.ui.tags", { _: "标签" }),
+      dataIndex: "tags",
+      width: 140,
+      render: (v: unknown) => {
+        const arr = Array.isArray(v)
+          ? (v as unknown[]).map((x) => String(x ?? ""))
+          : [];
+        const items = arr.filter(Boolean);
+        if (!items.length) return t("common.empty", { _: "无" });
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {items.map((text, idx) => (
+              <Tag key={`${text}-${idx}`} size="small">
+                {text}
+              </Tag>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      title: t("agent.ui.price", { _: "价格" }),
+      dataIndex: "price",
+      width: 260,
+      render: (v: unknown) => {
+        const s = typeof v === "string" ? v : String(v ?? "");
+        const text = s.replace(/<br\s*\/?>/gi, "\n");
+        return (
+          <span style={{ whiteSpace: "pre-wrap" }}>
+            {text || t("common.empty", { _: "无" })}
+          </span>
+        );
+      },
+    },
+    {
+      title: t("rag.ui.columns.description", { _: "描述" }),
+      dataIndex: "description",
+      width: 240,
+      render: (v: unknown) =>
+        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+    },
+    {
+      title: t("rag.ui.columns.operations", { _: "操作" }),
+      dataIndex: "operations",
+      width: 160,
+      render: (_: unknown, record: ListModelsNameSpace.ListModelsResult) => {
+        const id = Number(record.id || 0);
+        const selected = selectedModelId === id;
+        return (
+          <Space>
+            <Button
+              type={selected ? "outline" : "primary"}
+              onClick={() => toggleSelectModel(id)}
             >
               {selected
                 ? t("rag.ui.columns.unselect", { _: "取消选择" })
@@ -395,6 +558,9 @@ const CreateAgent: React.FC = () => {
             value={mcpQuery}
             onChange={setMcpQuery}
           />
+          <Button type="primary" onClick={fetchMcps} loading={mcpLoading}>
+            {t("rag.ui.search", { _: "搜索" })}
+          </Button>
         </Space>
       </div>
       <Table
@@ -403,6 +569,70 @@ const CreateAgent: React.FC = () => {
         data={mcpItems}
         rowKey="id"
         pagination={false}
+      />
+    </Card>
+  );
+
+  const modelPreview = (
+    <Card
+      style={{
+        boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          marginBottom: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Space>
+          <Tag color="arcoblue">
+            {t("rag.ui.selected.count", { _: "已选择" })}: {selectedModelText}
+          </Tag>
+        </Space>
+        <Space>
+          <Input
+            allowClear
+            style={{ width: 240 }}
+            placeholder={t("agent.ui.modelSearchPlaceholder", {
+              _: "搜索名称/厂商/标签/描述",
+            })}
+            value={modelQuery}
+            onChange={setModelQuery}
+            onPressEnter={() => fetchModels(1, modelPerPage)}
+          />
+          <Button
+            type="primary"
+            onClick={() => fetchModels(1, modelPerPage)}
+            loading={modelLoading}
+          >
+            {t("rag.ui.search", { _: "搜索" })}
+          </Button>
+        </Space>
+      </div>
+      <Table
+        loading={modelLoading}
+        columns={modelColumns}
+        data={modelItems}
+        rowKey="id"
+        pagination={{
+          current: modelPage,
+          pageSize: modelPerPage,
+          total: modelTotal,
+          onChange: (page) => {
+            setModelPage(page);
+            void fetchModels(page, modelPerPage);
+          },
+          onPageSizeChange: (size) => {
+            setModelPerPage(size);
+            setModelPage(1);
+            void fetchModels(1, size);
+          },
+        }}
       />
     </Card>
   );
@@ -517,6 +747,114 @@ const CreateAgent: React.FC = () => {
             </Card>
             <Card
               hoverable
+              onClick={() => setActive("model")}
+              style={{
+                borderColor: active === "model" ? "#165DFF" : undefined,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>{t("agent.ui.modelMessage", { _: "模型选择" })}</div>
+                <Tag color="arcoblue">
+                  {t("rag.ui.selected.count", { _: "已选择" })}:{" "}
+                  {selectedModelText}
+                </Tag>
+              </div>
+              <Form form={form} layout="vertical" style={{ marginTop: 12 }}>
+                <Form.Item
+                  label={t("agent.ui.modelSource", { _: "模型来源" })}
+                  field="model_source"
+                  initialValue="system"
+                >
+                  <Select
+                    value={modelSource}
+                    onChange={(val) => {
+                      const v =
+                        (val as "system" | "openai" | "custom") || "system";
+                      setModelSource(v);
+                      form.setFieldsValue({ model_source: v });
+                    }}
+                    options={[
+                      {
+                        value: "system",
+                        label: t("agent.ui.modelSource.system", {
+                          _: "系统模型",
+                        }),
+                      },
+                      {
+                        value: "openai",
+                        label: t("agent.ui.modelSource.openai", {
+                          _: "自定义openai模型",
+                        }),
+                      },
+                      {
+                        value: "custom",
+                        label: t("agent.ui.modelSource.custom", {
+                          _: "自定义模型",
+                        }),
+                      },
+                    ]}
+                  />
+                </Form.Item>
+                {modelSource === "openai" && (
+                  <Form.Item
+                    label={t("agent.ui.openaiApiKey", {
+                      _: "OpenAI API Key",
+                    })}
+                    field="openai_api_key"
+                    rules={[{ required: true }]}
+                  >
+                    <Input.Password
+                      allowClear
+                      placeholder={t("agent.ui.openaiApiKeyPlaceholder", {
+                        _: "填写你的 OpenAI Key",
+                      })}
+                    />
+                  </Form.Item>
+                )}
+                {modelSource === "custom" && (
+                  <>
+                    <Form.Item
+                      label={t("agent.ui.chatopenaiApiKey", {
+                        _: "ChatOpenAI API Key",
+                      })}
+                      field="chatopenai_api_key"
+                      rules={[{ required: true }]}
+                    >
+                      <Input.Password
+                        allowClear
+                        placeholder={t("agent.ui.chatopenaiApiKeyPlaceholder", {
+                          _: "必填，填写你的 ChatOpenAI Key",
+                        })}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label={t("agent.ui.chatopenaiBaseUrl", {
+                        _: "ChatOpenAI Base URL",
+                      })}
+                      field="chatopenai_base_url"
+                    >
+                      <Input
+                        allowClear
+                        placeholder={t(
+                          "agent.ui.chatopenaiBaseUrlPlaceholder",
+                          {
+                            _: "可选，例如 https://api.openai.com/v1",
+                          },
+                        )}
+                      />
+                    </Form.Item>
+                  </>
+                )}
+              </Form>
+            </Card>
+            <Card
+              hoverable
               onClick={() => setActive("rag")}
               style={{ borderColor: active === "rag" ? "#165DFF" : undefined }}
             >
@@ -527,7 +865,7 @@ const CreateAgent: React.FC = () => {
                   justifyContent: "space-between",
                 }}
               >
-                <div>{t("agent.ui.ragMessage", { _: "RAG 消息" })}</div>
+                <div>{t("agent.ui.ragMessage", { _: "知识库文档" })}</div>
                 <Tag color="arcoblue">
                   {t("rag.ui.selected.count", { _: "已选择" })}:{" "}
                   {selectedDocsText}
@@ -560,6 +898,7 @@ const CreateAgent: React.FC = () => {
           <div style={{ flex: 1 }}>
             {active === "rag" && ragPreview}
             {active === "mcp" && mcpPreview}
+            {active === "model" && modelSource === "system" && modelPreview}
           </div>
         </div>
       </Card>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useGetOne, useTranslate, Title } from "react-admin";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
   Button,
@@ -22,6 +22,7 @@ const RagShow: React.FC = () => {
   const { data, isLoading, error } = useGetOne("rag", { id });
   const [drawerVisible, setDrawerVisible] = useState(false);
   const { textColor, cardColorStyle } = useDarkMode();
+  const navigate = useNavigate();
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -132,6 +133,12 @@ const RagShow: React.FC = () => {
             target="_blank"
           >
             {translate("rag.ui.download", { _: "下载原文件" })}
+          </Button>
+          <Button
+            type="secondary"
+            onClick={() => navigate(`/rag/${id}/chunks`)}
+          >
+            {translate("rag.ui.chunkStrategy", { _: "切片策略" })}
           </Button>
         </Space>
       </Space>

@@ -34,6 +34,7 @@ import RagUploadPage from "./resources/rag/RagUploadPage";
 import RagShow from "./resources/rag/RagShow";
 import ChunkPage from "./resources/rag/ChunkPage";
 import ChunkShow from "./resources/rag/ChunkShow";
+import RagStrategyPage from "./resources/rag/RagStrategyPage";
 import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
 import Evaluation from "./resources/evaluation";
@@ -218,6 +219,14 @@ export const App = () => (
         element={
           <ArcoLocaleBridge>
             <ChunkShow />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Route
+        path="/rag/strategy/:strategyId"
+        element={
+          <ArcoLocaleBridge>
+            <RagStrategyPage />
           </ArcoLocaleBridge>
         }
       />

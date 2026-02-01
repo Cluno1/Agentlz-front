@@ -14,6 +14,8 @@ import {
   Form,
   Radio,
   Select,
+  Modal,
+  Popover,
 } from "@arco-design/web-react";
 import { useDarkMode } from "../../data/hook/useDark";
 import { listDocuments } from "../../data/api/rag";
@@ -23,6 +25,7 @@ import { listMcps } from "../../data/api/mcp";
 import type { ListMcpNameSpace } from "../../data/api/mcp/type";
 import { listModels } from "../../data/api/model";
 import type { ListModelsNameSpace } from "../../data/api/model/type";
+import { getStrategyOption } from "../rag/strategyOptions";
 
 const CreateAgent: React.FC = () => {
   const t = useTranslate();
@@ -38,9 +41,16 @@ const CreateAgent: React.FC = () => {
     [],
   );
   const [ragLoading, setRagLoading] = useState<boolean>(false);
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedDocs, setSelectedDocs] = useState<
+    Record<string, number[] | undefined>
+  >({});
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [pickStrategyVisible, setPickStrategyVisible] =
+    useState<boolean>(false);
+  const [pickStrategyDoc, setPickStrategyDoc] =
+    useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
+  const [pickStrategyValues, setPickStrategyValues] = useState<string[]>([]);
   const [mcpItems, setMcpItems] = useState<ListMcpNameSpace.ListMcpResult[]>(
     [],
   );
@@ -81,16 +91,22 @@ const CreateAgent: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const fetchRagDocs = async (opts?: { silent?: boolean }) => {
+  const fetchRagDocs = async (opts?: {
+    silent?: boolean;
+    scope?: "self" | "tenant" | "system";
+    title?: string;
+  }) => {
     setRagLoading(true);
     try {
+      const targetScope = opts?.scope ?? scope;
+      const targetTitle = opts?.title ?? titleQuery;
       const resp = await listDocuments({
         page: 1,
         perPage: 10,
         sortField: "id",
         sortOrder: "DESC",
-        filter: { disabled: false, status: "success", title: titleQuery },
-        type: scope,
+        filter: { disabled: false, status: "success", title: targetTitle },
+        type: targetScope,
       });
       setDocs(resp.data || []);
     } catch {
@@ -150,20 +166,63 @@ const CreateAgent: React.FC = () => {
     }
   };
 
-  const toggleSelectDoc = (id?: string) => {
-    if (!id) return;
-    setSelectedDocIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) return prev.filter((d) => d !== id);
-      return [...prev, id];
+  const selectedDocIds = useMemo(
+    () => Object.keys(selectedDocs),
+    [selectedDocs],
+  );
+
+  const unselectDoc = (id: string) => {
+    setSelectedDocs((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
     });
+  };
+
+  const openPickStrategy = (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
+    const id = String(rec.id || "");
+    if (!id) return;
+    const available = Array.isArray(rec.strategy) ? rec.strategy : [];
+    const normalized = Array.from(
+      new Set(available.map((x) => String(x)).filter(Boolean)),
+    );
+    if (normalized.length === 0) {
+      Message.warning(t("rag.ui.strategyEmpty", { _: "该文档暂无可选策略" }));
+      return;
+    }
+    setPickStrategyDoc(rec);
+    setPickStrategyValues(normalized);
+    setPickStrategyVisible(true);
+  };
+
+  const confirmPickStrategy = () => {
+    const rec = pickStrategyDoc;
+    const id = String(rec?.id || "");
+    if (!id) return;
+    const available = Array.isArray(rec?.strategy) ? rec?.strategy : [];
+    if (available.length > 0 && pickStrategyValues.length === 0) {
+      Message.warning(
+        t("rag.ui.selectStrategyTip", { _: "请选择至少一种策略" }),
+      );
+      return;
+    }
+    const nums = pickStrategyValues
+      .map((v) => Number(v))
+      .filter((n) => !Number.isNaN(n));
+    setSelectedDocs((prev) => ({
+      ...prev,
+      [id]: nums.length ? nums : undefined,
+    }));
+    setPickStrategyVisible(false);
+    setPickStrategyDoc(null);
+    setPickStrategyValues([]);
   };
 
   const selectedDocsText = useMemo(() => {
     if (!selectedDocIds.length)
       return t("rag.ui.selected.none", { _: "未选择" });
     return `${selectedDocIds.length}`;
-  }, [selectedDocIds, t]);
+  }, [selectedDocIds.length, t]);
 
   const toggleSelectMcp = (id?: number) => {
     if (!id && id !== 0) return;
@@ -226,7 +285,15 @@ const CreateAgent: React.FC = () => {
         description: values.description || undefined,
         system_prompt: values.system_prompt || undefined,
         meta: Object.keys(meta).length ? meta : undefined,
-        document_ids: selectedDocIds.length ? selectedDocIds : undefined,
+        documents: selectedDocIds.length
+          ? selectedDocIds.map((id) => {
+              const s = selectedDocs[id];
+              return {
+                id,
+                strategy: Array.isArray(s) && s.length ? s : undefined,
+              };
+            })
+          : undefined,
         mcp_agent_ids: selectedMcpIds.length ? selectedMcpIds : undefined,
       };
       await createAgent(payload, values.type || "self");
@@ -254,11 +321,6 @@ const CreateAgent: React.FC = () => {
 
   const ragColumns: RagColumn[] = [
     {
-      title: t("rag.ui.columns.id", { _: "ID" }),
-      dataIndex: "id",
-      width: 120,
-    },
-    {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "title",
       width: 240,
@@ -269,21 +331,71 @@ const CreateAgent: React.FC = () => {
       ),
     },
     {
+      title: t("rag.ui.columns.strategyCount", { _: "策略种类" }),
+      dataIndex: "strategy",
+      width: 140,
+      render: (_v: unknown, record: ListRagDocsNameSpace.ListRagDocsResult) => {
+        const ids = Array.isArray(record.strategy) ? record.strategy : [];
+        const normalized = Array.from(
+          new Set(ids.map((x) => String(x)).filter(Boolean)),
+        );
+        const count = normalized.length;
+        if (count === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 360 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  {t("rag.ui.columns.strategy", { _: "切割策略" })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {normalized.map((id) => {
+                    const opt = getStrategyOption(id);
+                    return (
+                      <Tag key={id} size="small">
+                        {opt?.label || `策略 ${id}`}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
+        );
+      },
+    },
+    {
       title: t("rag.ui.columns.operations", { _: "操作" }),
       dataIndex: "operations",
       width: 140,
       render: (_: unknown, record: ListRagDocsNameSpace.ListRagDocsResult) => {
         const id = String(record.id || "");
-        const selected = selectedDocIds.includes(id);
+        const selected = id ? id in selectedDocs : false;
+        const available = Array.isArray(record.strategy) ? record.strategy : [];
+        const normalized = Array.from(
+          new Set(available.map((x) => String(x)).filter(Boolean)),
+        );
+        const canPick = normalized.length > 0;
         return (
           <Space>
             <Button
               type={selected ? "outline" : "primary"}
-              onClick={() => toggleSelectDoc(id)}
+              onClick={() => {
+                if (!id) return;
+                if (selected) unselectDoc(id);
+                else openPickStrategy(record);
+              }}
+              disabled={!selected && !canPick}
             >
               {selected
                 ? t("rag.ui.columns.unselect", { _: "取消选择" })
-                : t("rag.ui.columns.select", { _: "选择" })}
+                : !canPick
+                  ? t("rag.ui.columns.unselectable", { _: "不可选择" })
+                  : t("rag.ui.columns.select", { _: "选择" })}
             </Button>
           </Space>
         );
@@ -460,21 +572,30 @@ const CreateAgent: React.FC = () => {
           <Button.Group>
             <Button
               type={scope === "self" ? "primary" : "outline"}
-              onClick={() => setScope("self")}
+              onClick={() => {
+                setScope("self");
+                void fetchRagDocs({ silent: true, scope: "self" });
+              }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
             {!isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
-                onClick={() => setScope("tenant")}
+                onClick={() => {
+                  setScope("tenant");
+                  void fetchRagDocs({ silent: true, scope: "tenant" });
+                }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
             <Button
               type={scope === "system" ? "primary" : "outline"}
-              onClick={() => setScope("system")}
+              onClick={() => {
+                setScope("system");
+                void fetchRagDocs({ silent: true, scope: "system" });
+              }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>
@@ -504,6 +625,47 @@ const CreateAgent: React.FC = () => {
         rowKey="id"
         pagination={false}
       />
+      <Modal
+        title={t("rag.ui.strategySelect", { _: "选择切割策略" })}
+        visible={pickStrategyVisible}
+        onCancel={() => {
+          setPickStrategyVisible(false);
+          setPickStrategyDoc(null);
+          setPickStrategyValues([]);
+        }}
+        onOk={confirmPickStrategy}
+      >
+        <div style={{ display: "grid", rowGap: 12 }}>
+          <div style={{ color: "var(--color-text-2)" }}>
+            {t("rag.ui.strategySelectTip", {
+              _: "请选择该文档绑定到智能体时使用的切割策略（可多选）",
+            })}
+          </div>
+          <Select
+            mode="multiple"
+            allowClear
+            style={{ width: "100%" }}
+            value={pickStrategyValues}
+            onChange={(vals) => {
+              const next = (vals as unknown[]).map((v) => String(v));
+              setPickStrategyValues(next);
+            }}
+          >
+            {(pickStrategyDoc && Array.isArray(pickStrategyDoc.strategy)
+              ? pickStrategyDoc.strategy
+              : []
+            ).map((sid) => {
+              const key = String(sid);
+              const opt = getStrategyOption(key);
+              return (
+                <Select.Option key={key} value={key}>
+                  {opt?.label || `策略 ${key}`}
+                </Select.Option>
+              );
+            })}
+          </Select>
+        </div>
+      </Modal>
     </Card>
   );
 

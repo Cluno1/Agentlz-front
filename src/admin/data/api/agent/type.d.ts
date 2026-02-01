@@ -17,6 +17,12 @@ export interface PaginationResult<T> {
   [k: string]: any;
 }
 
+export interface AgentDocumentBinding {
+  id: string;
+  strategy?: number[];
+  [k: string]: any;
+}
+
 /** @description Agent 列表 */
 export namespace ListAgentsNameSpace {
   /** @description Agent 列表 参数 */
@@ -63,7 +69,7 @@ export namespace CreateAgentNameSpace {
     meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
-    document_ids?: string[];
+    documents?: AgentDocumentBinding[];
     [k: string]: any;
   }
   /** @description 创建 Agent 返回结果 */
@@ -83,7 +89,7 @@ export namespace UpdateAgentNameSpace {
     meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
-    document_ids?: string[];
+    documents?: AgentDocumentBinding[];
     [k: string]: any;
   }
   /** @description 更新 Agent 返回结果 */

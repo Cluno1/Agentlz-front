@@ -32,6 +32,7 @@ import {
 } from "../../data/api/rag";
 import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
 import { useDarkMode } from "../../data/hook/useDark";
+import { getStrategyOption } from "./strategyOptions";
 
 const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
@@ -195,6 +196,10 @@ const RagPage: React.FC = () => {
     }
   };
 
+  const openStrategyDetail = (strategyId: string | number) => {
+    navigate(`/rag/strategy/${encodeURIComponent(String(strategyId))}`);
+  };
+
   const columns = [
     {
       title: t("rag.ui.columns.name", { _: "名称" }),
@@ -217,6 +222,57 @@ const RagPage: React.FC = () => {
         <Tag color={s === "ready" ? "green" : "orangered"}>{s}</Tag>
       ),
       width: 100,
+    },
+    {
+      title: t("rag.ui.columns.strategyCount", { _: "策略种类" }),
+      dataIndex: "strategy",
+      width: 120,
+      render: (
+        v: Array<string | number> | undefined,
+        record: ListRagDocsNameSpace.ListRagDocsResult,
+      ) => {
+        const ids = Array.isArray(record.strategy) ? record.strategy : v;
+        const arr = Array.isArray(ids) ? ids : [];
+        const normalized = Array.from(
+          new Set(arr.map((x) => String(x)).filter(Boolean)),
+        );
+        const count = normalized.length;
+        if (count === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 360 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  {t("rag.ui.columns.strategy", { _: "切割策略" })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {normalized.map((id) => {
+                    const opt = getStrategyOption(id);
+                    const label = opt?.label || `策略 ${id}`;
+                    return (
+                      <Tag
+                        key={id}
+                        size="small"
+                        style={{ cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStrategyDetail(id);
+                        }}
+                      >
+                        {label}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
+        );
+      },
     },
     {
       title: t("rag.ui.columns.uploadedBy", { _: "上传者" }),

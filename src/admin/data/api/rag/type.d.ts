@@ -44,6 +44,7 @@ export namespace ListRagDocsNameSpace {
     uploaded_by_user_username?: string;
     uploaded_by_user_avatar?: string;
     uploaded_by_user_email?: string;
+    strategy?: Array<string | number>;
     [k: string]: any;
   }
 }

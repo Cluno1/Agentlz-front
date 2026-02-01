@@ -1,43 +1,72 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useTranslate } from "react-admin";
+import { useTranslate, useGetIdentity } from "react-admin";
 import {
   Card,
   Button,
-  Input,
   Space,
   Table,
   Tag,
-  Form,
-  Radio,
-  Avatar,
+  Input,
+  Drawer,
 } from "@arco-design/web-react";
-import { IconUser } from "@arco-design/web-react/icon";
+import { Tooltip, Typography, Divider } from "@arco-design/web-react";
 import { listDocuments } from "../../../data/api/rag";
 import type { ListRagDocsNameSpace } from "../../../data/api/rag/type";
 import { listMcps } from "../../../data/api/mcp";
 import type { ListMcpNameSpace } from "../../../data/api/mcp/type";
+import {
+  listAgentChatHistory,
+  listAgentChatSessions,
+  chatAgentStream,
+} from "../../../data/api/agent";
+import { listModels, getModel } from "../../../data/api/model";
+import type { ListModelsNameSpace } from "../../../data/api/model/type";
 
-const Observation: React.FC = () => {
+type Props = {
+  active: "base" | "rag" | "mcp" | "model";
+  selectedDocIds: string[];
+  onToggleSelectDoc: (id?: string) => void;
+  selectedMcpIds: number[];
+  onToggleSelectMcp: (id?: number) => void;
+  agentId?: string;
+  modelSource?: "system" | "openai" | "custom";
+  selectedModelId?: number | null;
+  onToggleSelectModel?: (id?: number) => void;
+};
+
+const Observation: React.FC<Props> = ({
+  active,
+  selectedDocIds,
+  onToggleSelectDoc,
+  selectedMcpIds,
+  onToggleSelectMcp,
+  agentId,
+  modelSource,
+  selectedModelId,
+  onToggleSelectModel,
+}) => {
   const t = useTranslate();
-  const [active, setActive] = useState<"base" | "rag" | "mcp">("base");
-  const [form] = Form.useForm();
-  const [baseMessage, setBaseMessage] = useState<string>("");
+  const { identity } = useGetIdentity();
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
     [],
   );
   const [ragLoading, setRagLoading] = useState<boolean>(false);
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
   const [mcpItems, setMcpItems] = useState<ListMcpNameSpace.ListMcpResult[]>(
     [],
   );
   const [mcpLoading, setMcpLoading] = useState<boolean>(false);
-  const [selectedMcpIds, setSelectedMcpIds] = useState<number[]>([]);
   const [mcpQuery, setMcpQuery] = useState<string>("");
   const [mcpScope, setMcpScope] = useState<"self" | "tenant" | "system">(
     "self",
   );
+  const [modelItems, setModelItems] = useState<
+    ListModelsNameSpace.ListModelsResult[]
+  >([]);
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelQuery, setModelQuery] = useState("");
+  const [selectedModelName, setSelectedModelName] = useState<string>("");
 
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
@@ -91,6 +120,56 @@ const Observation: React.FC = () => {
     void run();
   }, [mcpScope, mcpQuery]);
 
+  useEffect(() => {
+    const run = async () => {
+      if (modelSource !== "system") return;
+      setModelLoading(true);
+      try {
+        const resp = await listModels({
+          page: 1,
+          perPage: 20,
+          sortField: "id",
+          sortOrder: "DESC",
+          filter: { q: modelQuery },
+          type: "system",
+        });
+        setModelItems(resp?.data || []);
+      } catch {
+        void 0;
+      } finally {
+        setModelLoading(false);
+      }
+    };
+    void run();
+  }, [modelSource, modelQuery]);
+
+  useEffect(() => {
+    if (modelSource !== "system") {
+      setSelectedModelName("");
+      return;
+    }
+    const id = Number(selectedModelId ?? 0);
+    if (!id) {
+      setSelectedModelName("");
+      return;
+    }
+    const found = modelItems.find((m) => Number(m.id || 0) === id);
+    if (found?.name) {
+      setSelectedModelName(String(found.name));
+      return;
+    }
+    const run = async () => {
+      try {
+        const row = await getModel(id);
+        const name = String(row?.name ?? "");
+        setSelectedModelName(name);
+      } catch {
+        setSelectedModelName("");
+      }
+    };
+    void run();
+  }, [modelSource, selectedModelId, modelItems]);
+
   const fetchRagDocs = async () => {
     setRagLoading(true);
     try {
@@ -111,12 +190,7 @@ const Observation: React.FC = () => {
   };
 
   const toggleSelectDoc = (id?: string) => {
-    if (!id) return;
-    setSelectedDocIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) return prev.filter((d) => d !== id);
-      return [...prev, id];
-    });
+    onToggleSelectDoc(id);
   };
 
   const selectedDocsText = useMemo(() => {
@@ -126,12 +200,7 @@ const Observation: React.FC = () => {
   }, [selectedDocIds, t]);
 
   const toggleSelectMcp = (id?: number) => {
-    if (typeof id !== "number") return;
-    setSelectedMcpIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) return prev.filter((d) => d !== id);
-      return [...prev, id];
-    });
+    onToggleSelectMcp(id);
   };
 
   const selectedMcpText = useMemo(() => {
@@ -159,12 +228,20 @@ const Observation: React.FC = () => {
     {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "title",
-      width: 240,
-      render: (v: unknown) => (
-        <span style={{ fontWeight: 500 }}>
-          {typeof v === "string" ? v : String(v ?? "")}
-        </span>
-      ),
+      width: 280,
+      render: (v: unknown) => {
+        const text = typeof v === "string" ? v : String(v ?? "");
+        return (
+          <Tooltip content={text}>
+            <Typography.Paragraph
+              style={{ marginBottom: 0 }}
+              ellipsis={{ rows: 1 }}
+            >
+              {text}
+            </Typography.Paragraph>
+          </Tooltip>
+        );
+      },
     },
     {
       title: t("rag.ui.columns.operations", { _: "操作" }),
@@ -209,18 +286,37 @@ const Observation: React.FC = () => {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "name",
       width: 240,
-      render: (v: unknown) => (
-        <span style={{ fontWeight: 500 }}>
-          {typeof v === "string" ? v : String(v ?? "")}
-        </span>
-      ),
+      render: (v: unknown) => {
+        const text = typeof v === "string" ? v : String(v ?? "");
+        return (
+          <Tooltip content={text}>
+            <Typography.Paragraph
+              style={{ marginBottom: 0 }}
+              ellipsis={{ rows: 1 }}
+            >
+              {text}
+            </Typography.Paragraph>
+          </Tooltip>
+        );
+      },
     },
     {
       title: t("rag.ui.columns.description", { _: "描述" }),
       dataIndex: "description",
       width: 240,
-      render: (v: unknown) =>
-        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+      render: (v: unknown) => {
+        const text = typeof v === "string" ? v : "";
+        return (
+          <Tooltip content={text || t("common.empty", { _: "无" })}>
+            <Typography.Paragraph
+              style={{ marginBottom: 0 }}
+              ellipsis={{ rows: 2 }}
+            >
+              {text || t("common.empty", { _: "无" })}
+            </Typography.Paragraph>
+          </Tooltip>
+        );
+      },
     },
     {
       title: t("rag.ui.columns.operations", { _: "操作" }),
@@ -244,90 +340,6 @@ const Observation: React.FC = () => {
       },
     },
   ];
-
-  const previewHeader = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <Avatar size={28}>
-        <img src="/agentlz-robot.jpg" alt="agent" />
-      </Avatar>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 500 }}>
-          {form.getFieldValue("name") || t("agent.ui.new", { _: "新智能体" })}
-        </div>
-        <div style={{ fontSize: 12, color: "#6b7280" }}>
-          {form.getFieldValue("description") || ""}
-        </div>
-      </div>
-    </div>
-  );
-
-  const basePreview = (
-    <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
-      {previewHeader}
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          flexDirection: "column",
-          rowGap: 12,
-        }}
-      >
-        {baseMessage && (
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <div
-              style={{
-                display: "flex",
-                maxWidth: "80%",
-                alignItems: "flex-start",
-                gap: 8,
-                flexDirection: "row-reverse",
-              }}
-            >
-              <Avatar size={28} style={{ backgroundColor: "#165DFF" }}>
-                <IconUser />
-              </Avatar>
-              <div
-                style={{
-                  borderRadius: 16,
-                  padding: "8px 12px",
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  backgroundColor: "rgb(22,93,255)",
-                  color: "#fff",
-                }}
-              >
-                {baseMessage}
-              </div>
-            </div>
-          </div>
-        )}
-        <div style={{ display: "flex", justifyContent: "flex-start" }}>
-          <div
-            style={{
-              display: "flex",
-              maxWidth: "80%",
-              alignItems: "flex-start",
-              gap: 8,
-            }}
-          >
-            <Avatar size={28}>
-              <img src="/agentlz-robot.jpg" alt="assistant" />
-            </Avatar>
-            <div
-              style={{
-                borderRadius: 16,
-                padding: "8px 12px",
-                fontSize: 14,
-                lineHeight: 1.6,
-              }}
-            >
-              {t("agent.ui.preview.reply", { _: "这是预览回复" })}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
 
   const ragPreview = (
     <Card
@@ -368,9 +380,9 @@ const Observation: React.FC = () => {
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>
           </Button.Group>
-          <span style={{ fontSize: 12, color: "#6b7280" }}>
+          <Tag color="arcoblue">
             {t("rag.ui.selected.count", { _: "已选择" })}: {selectedDocsText}
-          </span>
+          </Tag>
         </Space>
         <Space>
           <Input
@@ -386,6 +398,7 @@ const Observation: React.FC = () => {
           </Button>
         </Space>
       </div>
+      <Divider style={{ margin: "8px 0" }} />
       <Table
         loading={ragLoading}
         columns={ragColumns}
@@ -449,6 +462,7 @@ const Observation: React.FC = () => {
           />
         </Space>
       </div>
+      <Divider style={{ margin: "8px 0" }} />
       <Table
         loading={mcpLoading}
         columns={mcpColumns}
@@ -459,92 +473,374 @@ const Observation: React.FC = () => {
     </Card>
   );
 
-  return (
-    <div style={{ display: "flex", gap: 16 }}>
+  type ModelColumn = {
+    title: React.ReactNode;
+    dataIndex: string;
+    width?: number;
+    render?: (
+      value: unknown,
+      record: ListModelsNameSpace.ListModelsResult,
+    ) => React.ReactNode;
+  };
+
+  const modelColumns: ModelColumn[] = [
+    {
+      title: t("rag.ui.columns.name", { _: "名称" }),
+      dataIndex: "name",
+      width: 240,
+      render: (v: unknown) => (
+        <span style={{ fontWeight: 500 }}>
+          {typeof v === "string" ? v : String(v ?? "")}
+        </span>
+      ),
+    },
+    {
+      title: t("agent.ui.manufacturer", { _: "厂商" }),
+      dataIndex: "manufacturer",
+      width: 120,
+      render: (v: unknown) =>
+        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+    },
+    {
+      title: t("agent.ui.tags", { _: "标签" }),
+      dataIndex: "tags",
+      width: 140,
+      render: (v: unknown) => {
+        const arr = Array.isArray(v)
+          ? (v as unknown[]).map((x) => String(x ?? ""))
+          : [];
+        const items = arr.filter(Boolean);
+        if (!items.length) return t("common.empty", { _: "无" });
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {items.map((text, idx) => (
+              <Tag key={`${text}-${idx}`} size="small">
+                {text}
+              </Tag>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      title: t("agent.ui.price", { _: "价格" }),
+      dataIndex: "price",
+      width: 260,
+      render: (v: unknown) => {
+        const s = typeof v === "string" ? v : String(v ?? "");
+        const text = s.replace(/<br\s*\/?>/gi, "\n");
+        return (
+          <span style={{ whiteSpace: "pre-wrap" }}>
+            {text || t("common.empty", { _: "无" })}
+          </span>
+        );
+      },
+    },
+    {
+      title: t("rag.ui.columns.description", { _: "描述" }),
+      dataIndex: "description",
+      width: 240,
+      render: (v: unknown) =>
+        typeof v === "string" && v ? v : t("common.empty", { _: "无" }),
+    },
+    {
+      title: t("model.ui.columns.operations", { _: "操作" }),
+      dataIndex: "operations",
+      width: 160,
+      render: (_: unknown, record: ListModelsNameSpace.ListModelsResult) => {
+        const id = Number(record.id || 0);
+        const selected = Number(selectedModelId ?? 0) === id;
+        return (
+          <Space>
+            <Button
+              type={selected ? "outline" : "primary"}
+              onClick={() => onToggleSelectModel?.(id)}
+            >
+              {selected
+                ? t("rag.ui.columns.unselect", { _: "取消选择" })
+                : t("rag.ui.columns.select", { _: "选择" })}
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
+
+  const modelPreview = (
+    <Card
+      style={{
+        boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <div
         style={{
-          width: 360,
+          marginBottom: 8,
           display: "flex",
-          flexDirection: "column",
-          rowGap: 12,
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        <Card
-          hoverable
-          onClick={() => setActive("base")}
-          style={{ borderColor: active === "base" ? "#165DFF" : undefined }}
-        >
-          <Form form={form} layout="vertical">
-            <Form.Item
-              label={t("agent.ui.columns.name", { _: "名称" })}
-              field="name"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              label={t("agent.ui.columns.description", { _: "描述" })}
-              field="description"
-            >
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item
-              label={t("agent.ui.columns.type", { _: "类型" })}
-              field="type"
-              initialValue="self"
-            >
-              <Radio.Group>
-                <Radio value="self">
-                  {t("rag.ui.tabs.self", { _: "个人" })}
-                </Radio>
-                {!isDefaultTenant && (
-                  <Radio value="tenant">
-                    {t("rag.ui.tabs.tenant", { _: "租户" })}
-                  </Radio>
-                )}
-              </Radio.Group>
-            </Form.Item>
-            <Form.Item label={t("agent.ui.baseMessage", { _: "基础消息" })}>
-              <Input.TextArea
-                rows={4}
-                value={baseMessage}
-                onChange={setBaseMessage}
-                placeholder={t("agent.ui.placeholder", { _: "请输入消息" })}
-              />
-            </Form.Item>
-          </Form>
-        </Card>
-        <Card
-          hoverable
-          onClick={() => setActive("rag")}
-          style={{ borderColor: active === "rag" ? "#165DFF" : undefined }}
-        >
+        <Space>
+          <Tag color="arcoblue">
+            {t("rag.ui.selected.count", { _: "已选择" })}:{" "}
+            {selectedModelName ? selectedModelName : selectedModelId ? 1 : 0}
+          </Tag>
+        </Space>
+        <Space>
+          <Input
+            allowClear
+            style={{ width: 240 }}
+            placeholder={t("model.ui.searchPlaceholder", { _: "搜索模型" })}
+            value={modelQuery}
+            onChange={setModelQuery}
+          />
+        </Space>
+      </div>
+      <Divider style={{ margin: "8px 0" }} />
+      <Table
+        loading={modelLoading}
+        columns={modelColumns}
+        data={modelItems}
+        rowKey="id"
+        pagination={false}
+      />
+    </Card>
+  );
+
+  const [messages, setMessages] = useState<
+    Array<{ role: "user" | "assistant" | "system"; content: string }>
+  >([]);
+  const [input, setInput] = useState<string>("");
+  const [sending, setSending] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState<
+    Array<{
+      id?: number;
+      record_id?: number;
+      name?: string | null;
+      summary?: string | null;
+      content?: string | null;
+    }>
+  >([]);
+  const [recordId, setRecordId] = useState<number | null>(null);
+
+  const sendMessage = async () => {
+    if (!input || !agentId) return;
+    const agentNum = Number(agentId);
+    if (Number.isNaN(agentNum)) return;
+    setSending(true);
+    const controller = new AbortController();
+    try {
+      const meta: Record<string, unknown> = {
+        uid: identity?.id,
+        ts: Date.now(),
+      };
+      const type = recordId ? 1 : 0;
+      const payload = {
+        agent_id: agentNum,
+        type,
+        record_id: recordId ?? undefined,
+        meta,
+        message: input,
+      };
+      setMessages((prev) => [...prev, { role: "user", content: input }]);
+      setInput("");
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      for await (const chunk of chatAgentStream(payload, {
+        signal: controller.signal,
+      })) {
+        if (typeof chunk?.record_id === "number" && !recordId) {
+          setRecordId(chunk.record_id);
+        }
+        if (chunk?.done) {
+          break;
+        }
+        const delta = String(chunk?.delta ?? chunk?.text ?? "");
+        if (delta) {
+          setMessages((prev) => {
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].role === "assistant") {
+                next[i] = {
+                  ...next[i],
+                  content: (next[i].content || "") + delta,
+                };
+                break;
+              }
+            }
+            return next;
+          });
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSending(false);
+      void 0;
+    }
+  };
+
+  const openHistory = async () => {
+    if (!agentId) {
+      setHistoryOpen(true);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const resp = await listAgentChatHistory({
+        agent_id: Number(agentId),
+        page: 1,
+        per_page: 20,
+      });
+      setHistoryData(resp?.data || []);
+    } catch {
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+      setHistoryOpen(true);
+    }
+  };
+
+  const loadSessions = async (rid: number) => {
+    try {
+      const resp = await listAgentChatSessions({
+        agent_id: Number(agentId),
+        record_id: rid,
+        page: 1,
+        per_page: 100,
+      });
+      const rows = resp?.data || [];
+      const mapped = rows.map((it) => {
+        const role =
+          it.role === "user" || it.role === "assistant" || it.role === "system"
+            ? it.role
+            : "assistant";
+        const content = String(it.content ?? it.message ?? it.output ?? "");
+        return { role, content };
+      });
+      setMessages(mapped);
+    } catch {
+      setMessages([]);
+    }
+  };
+
+  const chatPreview = (
+    <Card style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <Space>
+          <Button type="primary" onClick={() => setMessages([])}>
+            {t("chat.ui.new", { _: "新对话" })}
+          </Button>
+          <Button onClick={openHistory}>
+            {t("chat.ui.history", { _: "历史纪录" })}
+          </Button>
+        </Space>
+      </div>
+      <Divider style={{ margin: "8px 0" }} />
+      <div style={{ display: "flex", flexDirection: "column", rowGap: 12 }}>
+        {messages.map((m, idx) => (
           <div
+            key={idx}
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: m.role === "user" ? "flex-end" : "flex-start",
             }}
           >
-            <div>{t("agent.ui.ragMessage", { _: "RAG 消息" })}</div>
-            <Tag color="arcoblue">
-              {t("rag.ui.selected.count", { _: "已选择" })}: {selectedDocsText}
-            </Tag>
+            <div
+              style={{
+                borderRadius: 16,
+                padding: "8px 12px",
+                fontSize: 14,
+                lineHeight: 1.6,
+                backgroundColor:
+                  m.role === "user" ? "rgb(22,93,255)" : "#f6f7fb",
+                color: m.role === "user" ? "#fff" : "#1f2937",
+                maxWidth: "80%",
+              }}
+            >
+              {m.content}
+            </div>
           </div>
-        </Card>
-        <Card
-          hoverable
-          onClick={() => setActive("mcp")}
-          style={{ borderColor: active === "mcp" ? "#165DFF" : undefined }}
-        >
-          <div>{t("agent.ui.mcpMessage", { _: "MCP 消息" })}</div>
-        </Card>
+        ))}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input.TextArea
+            rows={3}
+            value={input}
+            onChange={setInput}
+            placeholder={t("chat.ui.placeholder", { _: "输入消息并发送" })}
+          />
+          <Button type="primary" loading={sending} onClick={sendMessage}>
+            {t("chat.ui.send", { _: "发送" })}
+          </Button>
+        </div>
       </div>
-      <div style={{ flex: 1 }}>
-        {active === "base" && basePreview}
-        {active === "rag" && ragPreview}
-        {active === "mcp" && mcpPreview}
-      </div>
+      <Drawer
+        title={t("chat.ui.history", { _: "历史纪录" })}
+        visible={historyOpen}
+        onCancel={() => setHistoryOpen(false)}
+        width={520}
+      >
+        <Table
+          loading={historyLoading}
+          columns={[
+            { title: "ID", dataIndex: "id", width: 80 },
+            {
+              title: t("chat.ui.columns.name", { _: "名称" }),
+              dataIndex: "name",
+              width: 160,
+            },
+            {
+              title: t("chat.ui.columns.summary", { _: "摘要" }),
+              dataIndex: "summary",
+              width: 220,
+            },
+            {
+              title: t("rag.ui.columns.operations", { _: "操作" }),
+              dataIndex: "operations",
+              width: 120,
+              render: (
+                _: unknown,
+                record: { id?: number; record_id?: number },
+              ) => (
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    const rid = Number(record?.id ?? record?.record_id ?? 0);
+                    if (!rid) return;
+                    setRecordId(rid);
+                    void loadSessions(rid);
+                    setHistoryOpen(false);
+                  }}
+                >
+                  {t("chat.ui.use", { _: "继续对话" })}
+                </Button>
+              ),
+            },
+          ]}
+          data={historyData}
+          rowKey={(r) => String(r?.id ?? r?.record_id ?? Math.random())}
+          pagination={false}
+        />
+      </Drawer>
+    </Card>
+  );
+
+  return (
+    <div style={{ flex: 1 }}>
+      {active === "base" && chatPreview}
+      {active === "rag" && ragPreview}
+      {active === "mcp" && mcpPreview}
+      {active === "model" && modelSource === "system" && modelPreview}
     </div>
   );
 };

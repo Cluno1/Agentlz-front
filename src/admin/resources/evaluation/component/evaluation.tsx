@@ -12,9 +12,20 @@ import {
   Tag,
   Spin,
   Divider,
+  Grid,
+  Statistic,
+  Progress,
+  Avatar,
+  Tooltip,
+  Typography,
 } from "@arco-design/web-react";
 import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
-import { IconUpload, IconRefresh } from "@arco-design/web-react/icon";
+import {
+  IconUpload,
+  IconRefresh,
+  IconCheckCircle,
+  IconCloseCircle,
+} from "@arco-design/web-react/icon";
 import { listAccessibleAgents, chatAgentStream } from "../../../data/api/agent";
 import type {
   AgentChatInput,
@@ -44,7 +55,7 @@ const Evaluation: React.FC = () => {
   const t = useTranslate();
   const { identity } = useGetIdentity();
   const [agents, setAgents] = useState<
-    Array<{ id: string; name: string; description?: string }>
+    Array<{ id: string; name: string; description?: string; avatar?: string }>
   >([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
@@ -76,6 +87,7 @@ const Evaluation: React.FC = () => {
             id: String(a.id ?? a.agent_id ?? ""),
             name: a.name ?? "",
             description: a.description ?? "",
+            avatar: a.avatar ?? "",
           }))
           .filter((a: { id: string }) => !!a.id);
         setAgents(mapped);
@@ -265,6 +277,28 @@ const Evaluation: React.FC = () => {
     return Math.round(sum / done.length);
   }, [rows]);
 
+  const totalCount = useMemo(() => rows.length, [rows]);
+  const evaluatedCount = useMemo(
+    () => rows.filter((r) => typeof r.timeMs === "number").length,
+    [rows],
+  );
+  const correctCount = useMemo(
+    () => rows.filter((r) => r.correct === true).length,
+    [rows],
+  );
+  const wrongCount = useMemo(
+    () => rows.filter((r) => r.correct === false).length,
+    [rows],
+  );
+  const pendingCount = useMemo(
+    () => Math.max(0, totalCount - evaluatedCount),
+    [totalCount, evaluatedCount],
+  );
+  const donePercent = useMemo(() => {
+    if (!totalCount) return 0;
+    return Math.round((evaluatedCount / totalCount) * 100);
+  }, [totalCount, evaluatedCount]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", rowGap: 16 }}>
       <Card>
@@ -297,7 +331,7 @@ const Evaluation: React.FC = () => {
           </Space>
           <Space>
             <Select
-              style={{ width: 280 }}
+              style={{ width: 320 }}
               value={agentId}
               onChange={setAgentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
@@ -309,7 +343,78 @@ const Evaluation: React.FC = () => {
             >
               {agents.map((a) => (
                 <Select.Option key={a.id} value={a.id}>
-                  {a.name}
+                  <Space>
+                    <Avatar size={20} style={{ backgroundColor: "#f6f7fb" }}>
+                      {a.avatar ? (
+                        <img src={a.avatar} alt={a.name} />
+                      ) : (
+                        a.name?.slice(0, 1) || "A"
+                      )}
+                    </Avatar>
+                    <span>{a.name}</span>
+                  </Space>
+                </Select.Option>
+              ))}
+            </Select>
+          </Space>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 12,
+          }}
+        >
+          <Space>
+            {agentId && (
+              <Space>
+                <Avatar size={32} style={{ backgroundColor: "#f6f7fb" }}>
+                  {agents.find((x) => x.id === agentId)?.avatar ? (
+                    <img
+                      src={agents.find((x) => x.id === agentId)?.avatar || ""}
+                      alt={agents.find((x) => x.id === agentId)?.name || ""}
+                    />
+                  ) : (
+                    (agents.find((x) => x.id === agentId)?.name || "A").slice(
+                      0,
+                      1,
+                    )
+                  )}
+                </Avatar>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <Typography.Text style={{ fontWeight: 600 }}>
+                    {agents.find((x) => x.id === agentId)?.name || "-"}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {agents.find((x) => x.id === agentId)?.description || ""}
+                  </Typography.Text>
+                </div>
+              </Space>
+            )}
+          </Space>
+          <Space>
+            <Select
+              style={{ width: 200 }}
+              placeholder={t("evaluation.ui.questionCol", { _: "问题列" })}
+              value={questionCol}
+              onChange={setQuestionCol}
+            >
+              {headers.map((h) => (
+                <Select.Option key={h} value={h}>
+                  {h}
+                </Select.Option>
+              ))}
+            </Select>
+            <Select
+              style={{ width: 200 }}
+              placeholder={t("evaluation.ui.answerCol", { _: "答案列" })}
+              value={answerCol}
+              onChange={setAnswerCol}
+            >
+              {headers.map((h) => (
+                <Select.Option key={h} value={h}>
+                  {h}
                 </Select.Option>
               ))}
             </Select>
@@ -346,94 +451,235 @@ const Evaluation: React.FC = () => {
           >
             {t("rag.ui.clear", { _: "清空" })}
           </Button>
+          <Button
+            type="primary"
+            onClick={handleEvaluate}
+            loading={evaluating}
+            disabled={!agentId || !questionCol || !rows.length}
+          >
+            {t("evaluation.ui.start", { _: "开始评测" })}
+          </Button>
         </Space>
       </Card>
 
       {rows.length > 0 && (
         <Card>
-          <Space style={{ marginBottom: 12 }}>
-            <Tag color="arcoblue">
-              {t("rag.ui.selected.count", { _: "已选择" })}: {rows.length}
-            </Tag>
-            <Select
-              style={{ width: 200 }}
-              placeholder={t("evaluation.ui.questionCol", { _: "问题列" })}
-              value={questionCol}
-              onChange={setQuestionCol}
-            >
-              {headers.map((h) => (
-                <Select.Option key={h} value={h}>
-                  {h}
-                </Select.Option>
-              ))}
-            </Select>
-            <Select
-              style={{ width: 200 }}
-              placeholder={t("evaluation.ui.answerCol", { _: "答案列" })}
-              value={answerCol}
-              onChange={setAnswerCol}
-            >
-              {headers.map((h) => (
-                <Select.Option key={h} value={h}>
-                  {h}
-                </Select.Option>
-              ))}
-            </Select>
-            <Button
-              type="primary"
-              onClick={handleEvaluate}
-              loading={evaluating}
-              disabled={!agentId || !questionCol}
-            >
-              {t("evaluation.ui.start", { _: "开始评测" })}
-            </Button>
-          </Space>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <Space>
+              <Tag color="arcoblue">
+                {t("rag.ui.selected.count", { _: "已选择" })}: {rows.length}
+              </Tag>
+            </Space>
+            <Space>
+              <Button
+                type="primary"
+                onClick={handleEvaluate}
+                loading={evaluating}
+                disabled={!agentId || !questionCol || !rows.length}
+              >
+                {t("evaluation.ui.start", { _: "开始评测" })}
+              </Button>
+            </Space>
+          </div>
+          <Grid.Row gutter={16} style={{ marginBottom: 12 }}>
+            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
+              <Card bordered hoverable>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <Progress
+                    type="circle"
+                    percent={accuracy}
+                    style={{ marginRight: 12 }}
+                  />
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <Typography.Text style={{ fontWeight: 600 }}>
+                      {t("evaluation.ui.accuracy", { _: "准确率" })}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {t("evaluation.ui.avgTime", { _: "平均用时" })}:{" "}
+                      {avgTimeMs}ms
+                    </Typography.Text>
+                  </div>
+                </div>
+              </Card>
+            </Grid.Col>
+            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
+              <Card bordered hoverable>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  <Statistic
+                    title={t("evaluation.ui.columns.correct", {
+                      _: "是否正确",
+                    })}
+                    value={`${correctCount}/${evaluatedCount}`}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Tag color="green">
+                      {t("common.yes", { _: "是" })}: {correctCount}
+                    </Tag>
+                    <Tag color="red">
+                      {t("common.no", { _: "否" })}: {wrongCount}
+                    </Tag>
+                  </div>
+                </div>
+              </Card>
+            </Grid.Col>
+            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
+              <Card bordered hoverable>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  <Statistic
+                    title={t("evaluation.ui.total", { _: "总题数" })}
+                    value={totalCount}
+                  />
+                  <Tooltip content={`${donePercent}%`}>
+                    <Progress percent={donePercent} status="normal" />
+                  </Tooltip>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Tag color="arcoblue">
+                      {t("evaluation.ui.done", { _: "已评测" })}:{" "}
+                      {evaluatedCount}
+                    </Tag>
+                    <Tag>
+                      {t("evaluation.ui.pending", { _: "未评测" })}:{" "}
+                      {pendingCount}
+                    </Tag>
+                  </div>
+                </div>
+              </Card>
+            </Grid.Col>
+            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
+              <Card bordered hoverable>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Avatar size={40} style={{ backgroundColor: "#f6f7fb" }}>
+                    {agents.find((x) => x.id === agentId)?.avatar ? (
+                      <img
+                        src={agents.find((x) => x.id === agentId)?.avatar || ""}
+                        alt={agents.find((x) => x.id === agentId)?.name || ""}
+                      />
+                    ) : (
+                      (agents.find((x) => x.id === agentId)?.name || "A").slice(
+                        0,
+                        1,
+                      )
+                    )}
+                  </Avatar>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <Typography.Text style={{ fontWeight: 600 }}>
+                      {agents.find((x) => x.id === agentId)?.name || "-"}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      {agents.find((x) => x.id === agentId)?.description || ""}
+                    </Typography.Text>
+                  </div>
+                </div>
+              </Card>
+            </Grid.Col>
+          </Grid.Row>
           <Divider />
-          <Space style={{ marginBottom: 12 }}>
-            <Tag color="green">
-              {t("evaluation.ui.accuracy", { _: "准确率" })}: {accuracy}%
-            </Tag>
-            <Tag color="gold">
-              {t("evaluation.ui.avgTime", { _: "平均用时" })}: {avgTimeMs}ms
-            </Tag>
-          </Space>
           <Table
             loading={evaluating && !rows.length}
             pagination={false}
             rowKey="id"
+            expandedRowRender={(record) => (
+              <div style={{ display: "flex", gap: 12 }}>
+                <Card style={{ flex: 1 }} bordered>
+                  <Typography.Text style={{ fontWeight: 600 }}>
+                    {t("evaluation.ui.columns.expected", { _: "期望答案" })}
+                  </Typography.Text>
+                  <Typography.Paragraph style={{ marginBottom: 0 }}>
+                    {record.expected || "-"}
+                  </Typography.Paragraph>
+                </Card>
+                <Card style={{ flex: 1 }} bordered>
+                  <Typography.Text style={{ fontWeight: 600 }}>
+                    {t("evaluation.ui.columns.answer", { _: "生成答案" })}
+                  </Typography.Text>
+                  <Typography.Paragraph style={{ marginBottom: 0 }}>
+                    {record.answer || "-"}
+                  </Typography.Paragraph>
+                </Card>
+              </div>
+            )}
             columns={[
               { title: "ID", dataIndex: "id", width: 80 },
               {
                 title: t("evaluation.ui.columns.question", { _: "问题" }),
                 dataIndex: "question",
-                width: 240,
+                width: 280,
+                render: (v: string) => (
+                  <Tooltip content={v || "-"}>
+                    <Typography.Paragraph
+                      style={{ marginBottom: 0 }}
+                      ellipsis={{ rows: 2 }}
+                    >
+                      {v || "-"}
+                    </Typography.Paragraph>
+                  </Tooltip>
+                ),
               },
               {
                 title: t("evaluation.ui.columns.expected", { _: "期望答案" }),
                 dataIndex: "expected",
-                width: 240,
+                width: 280,
+                render: (v: string) => (
+                  <Tooltip content={v || "-"}>
+                    <Typography.Paragraph
+                      style={{ marginBottom: 0 }}
+                      ellipsis={{ rows: 2 }}
+                    >
+                      {v || "-"}
+                    </Typography.Paragraph>
+                  </Tooltip>
+                ),
               },
               {
                 title: t("evaluation.ui.columns.answer", { _: "生成答案" }),
                 dataIndex: "answer",
+                render: (v: string) => (
+                  <Tooltip content={v || "-"}>
+                    <Typography.Paragraph
+                      style={{ marginBottom: 0 }}
+                      ellipsis={{ rows: 2 }}
+                    >
+                      {v || "-"}
+                    </Typography.Paragraph>
+                  </Tooltip>
+                ),
               },
               {
                 title: t("evaluation.ui.columns.time", { _: "用时(ms)" }),
                 dataIndex: "timeMs",
-                width: 120,
-                render: (v: unknown) => (typeof v === "number" ? v : "-"),
+                width: 140,
+                render: (v: unknown) =>
+                  typeof v === "number" ? `${v}ms` : "-",
               },
               {
                 title: t("evaluation.ui.columns.correct", { _: "是否正确" }),
                 dataIndex: "correct",
-                width: 120,
+                width: 140,
                 render: (v: unknown) =>
                   typeof v === "boolean" ? (
-                    <Tag color={v ? "green" : "red"}>
-                      {v
-                        ? t("common.yes", { _: "是" })
-                        : t("common.no", { _: "否" })}
-                    </Tag>
+                    <Space>
+                      {v ? (
+                        <IconCheckCircle style={{ color: "#04C877" }} />
+                      ) : (
+                        <IconCloseCircle style={{ color: "#F53F3F" }} />
+                      )}
+                      <Tag color={v ? "green" : "red"}>
+                        {v
+                          ? t("common.yes", { _: "是" })
+                          : t("common.no", { _: "否" })}
+                      </Tag>
+                    </Space>
                   ) : (
                     <Tag>...</Tag>
                   ),

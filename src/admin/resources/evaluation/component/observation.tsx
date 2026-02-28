@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslate, useGetIdentity } from "react-admin";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   Button,
@@ -8,6 +9,10 @@ import {
   Tag,
   Input,
   Drawer,
+  Modal,
+  Popover,
+  Select,
+  Message,
 } from "@arco-design/web-react";
 import { Tooltip, Typography, Divider } from "@arco-design/web-react";
 import { listDocuments } from "../../../data/api/rag";
@@ -21,11 +26,14 @@ import {
 } from "../../../data/api/agent";
 import { listModels, getModel } from "../../../data/api/model";
 import type { ListModelsNameSpace } from "../../../data/api/model/type";
+import { getStrategyOption } from "../../rag/strategyOptions";
 
 type Props = {
   active: "base" | "rag" | "mcp" | "model";
-  selectedDocIds: string[];
-  onToggleSelectDoc: (id?: string) => void;
+  selectedDocs: Record<string, number[] | undefined>;
+  setSelectedDocs: React.Dispatch<
+    React.SetStateAction<Record<string, number[] | undefined>>
+  >;
   selectedMcpIds: number[];
   onToggleSelectMcp: (id?: number) => void;
   agentId?: string;
@@ -36,8 +44,8 @@ type Props = {
 
 const Observation: React.FC<Props> = ({
   active,
-  selectedDocIds,
-  onToggleSelectDoc,
+  selectedDocs,
+  setSelectedDocs,
   selectedMcpIds,
   onToggleSelectMcp,
   agentId,
@@ -46,6 +54,7 @@ const Observation: React.FC<Props> = ({
   onToggleSelectModel,
 }) => {
   const t = useTranslate();
+  const navigate = useNavigate();
   const { identity } = useGetIdentity();
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
     [],
@@ -53,6 +62,10 @@ const Observation: React.FC<Props> = ({
   const [ragLoading, setRagLoading] = useState<boolean>(false);
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [pickStrategyVisible, setPickStrategyVisible] = useState(false);
+  const [pickStrategyDoc, setPickStrategyDoc] =
+    useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
+  const [pickStrategyValues, setPickStrategyValues] = useState<string[]>([]);
   const [mcpItems, setMcpItems] = useState<ListMcpNameSpace.ListMcpResult[]>(
     [],
   );
@@ -76,27 +89,42 @@ const Observation: React.FC<Props> = ({
     if (isDefaultTenant && scope === "tenant") setScope("self");
   }, [isDefaultTenant, scope]);
 
-  useEffect(() => {
-    const run = async () => {
+  const fetchRagDocs = useCallback(
+    async (opts?: {
+      silent?: boolean;
+      scope?: "self" | "tenant" | "system";
+      title?: string;
+    }) => {
       setRagLoading(true);
       try {
+        const targetScope = opts?.scope ?? scope;
+        const targetTitle = opts?.title ?? titleQuery;
         const resp = await listDocuments({
           page: 1,
           perPage: 10,
           sortField: "id",
           sortOrder: "DESC",
-          filter: { disabled: false, status: "success", title: "" },
-          type: scope,
+          filter: { disabled: false, status: "success", title: targetTitle },
+          type: targetScope,
         });
         setDocs(resp.data || []);
       } catch {
-        void 0;
+        if (!opts?.silent)
+          Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
       } finally {
         setRagLoading(false);
       }
-    };
-    void run();
-  }, [scope]);
+    },
+    [scope, t, titleQuery],
+  );
+
+  const openStrategyDetail = (strategyId: string | number) => {
+    navigate(`/rag/strategy/${encodeURIComponent(String(strategyId))}`);
+  };
+
+  useEffect(() => {
+    void fetchRagDocs({ silent: true });
+  }, [fetchRagDocs]);
 
   useEffect(() => {
     const run = async () => {
@@ -170,27 +198,56 @@ const Observation: React.FC<Props> = ({
     void run();
   }, [modelSource, selectedModelId, modelItems]);
 
-  const fetchRagDocs = async () => {
-    setRagLoading(true);
-    try {
-      const resp = await listDocuments({
-        page: 1,
-        perPage: 10,
-        sortField: "id",
-        sortOrder: "DESC",
-        filter: { disabled: false, status: "success", title: titleQuery },
-        type: scope,
-      });
-      setDocs(resp.data || []);
-    } catch {
-      void 0;
-    } finally {
-      setRagLoading(false);
-    }
+  const selectedDocIds = useMemo(
+    () => Object.keys(selectedDocs),
+    [selectedDocs],
+  );
+
+  const unselectDoc = (id: string) => {
+    setSelectedDocs((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
-  const toggleSelectDoc = (id?: string) => {
-    onToggleSelectDoc(id);
+  const openPickStrategy = (rec: ListRagDocsNameSpace.ListRagDocsResult) => {
+    const id = String(rec.id || "");
+    if (!id) return;
+    const available = Array.isArray(rec.strategy) ? rec.strategy : [];
+    const normalized = Array.from(
+      new Set(available.map((x) => String(x)).filter(Boolean)),
+    );
+    if (normalized.length === 0) {
+      Message.warning(t("rag.ui.strategyEmpty", { _: "该文档暂无可选策略" }));
+      return;
+    }
+    setPickStrategyDoc(rec);
+    setPickStrategyValues(normalized);
+    setPickStrategyVisible(true);
+  };
+
+  const confirmPickStrategy = () => {
+    const rec = pickStrategyDoc;
+    const id = String(rec?.id || "");
+    if (!id) return;
+    const available = Array.isArray(rec?.strategy) ? rec?.strategy : [];
+    if (available.length > 0 && pickStrategyValues.length === 0) {
+      Message.warning(
+        t("rag.ui.selectStrategyTip", { _: "请选择至少一种策略" }),
+      );
+      return;
+    }
+    const nums = pickStrategyValues
+      .map((v) => Number(v))
+      .filter((n) => !Number.isNaN(n));
+    setSelectedDocs((prev) => ({
+      ...prev,
+      [id]: nums.length ? nums : undefined,
+    }));
+    setPickStrategyVisible(false);
+    setPickStrategyDoc(null);
+    setPickStrategyValues([]);
   };
 
   const selectedDocsText = useMemo(() => {
@@ -221,25 +278,108 @@ const Observation: React.FC<Props> = ({
 
   const ragColumns: RagColumn[] = [
     {
-      title: t("rag.ui.columns.id", { _: "ID" }),
-      dataIndex: "id",
-      width: 120,
-    },
-    {
       title: t("rag.ui.columns.name", { _: "名称" }),
       dataIndex: "title",
-      width: 280,
-      render: (v: unknown) => {
-        const text = typeof v === "string" ? v : String(v ?? "");
+      width: 240,
+      render: (v: unknown) => (
+        <span style={{ fontWeight: 500 }}>
+          {typeof v === "string" ? v : String(v ?? "")}
+        </span>
+      ),
+    },
+    {
+      title: t("rag.ui.columns.strategyCount", { _: "策略种类" }),
+      dataIndex: "strategy",
+      width: 140,
+      render: (_v: unknown, record: ListRagDocsNameSpace.ListRagDocsResult) => {
+        const ids = Array.isArray(record.strategy) ? record.strategy : [];
+        const normalized = Array.from(
+          new Set(ids.map((x) => String(x)).filter(Boolean)),
+        );
+        const count = normalized.length;
+        if (count === 0) return 0;
         return (
-          <Tooltip content={text}>
-            <Typography.Paragraph
-              style={{ marginBottom: 0 }}
-              ellipsis={{ rows: 1 }}
-            >
-              {text}
-            </Typography.Paragraph>
-          </Tooltip>
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 360 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  {t("rag.ui.columns.strategy", { _: "切割策略" })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {normalized.map((id) => {
+                    const opt = getStrategyOption(id);
+                    const label = opt?.label || `策略 ${id}`;
+                    return (
+                      <Tag
+                        key={id}
+                        size="small"
+                        style={{ cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStrategyDetail(id);
+                        }}
+                      >
+                        {label}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
+        );
+      },
+    },
+    {
+      title: t("rag.ui.columns.selectedStrategyCount", { _: "已选策略" }),
+      dataIndex: "selectedStrategy",
+      width: 140,
+      render: (_v: unknown, record: ListRagDocsNameSpace.ListRagDocsResult) => {
+        const id = String(record.id || "");
+        if (!id || !(id in selectedDocs)) return "-";
+        const ids = Array.isArray(selectedDocs[id]) ? selectedDocs[id] : [];
+        const normalized = Array.from(
+          new Set(ids.map((x) => String(x)).filter(Boolean)),
+        );
+        const count = normalized.length;
+        if (count === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 360 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  {t("rag.ui.columns.selectedStrategy", { _: "已选切割策略" })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {normalized.map((sid) => {
+                    const opt = getStrategyOption(sid);
+                    const label = opt?.label || `策略 ${sid}`;
+                    return (
+                      <Tag
+                        key={sid}
+                        size="small"
+                        style={{ cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStrategyDetail(sid);
+                        }}
+                      >
+                        {label}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
         );
       },
     },
@@ -249,16 +389,28 @@ const Observation: React.FC<Props> = ({
       width: 140,
       render: (_: unknown, record: ListRagDocsNameSpace.ListRagDocsResult) => {
         const id = String(record.id || "");
-        const selected = selectedDocIds.includes(id);
+        const selected = id ? id in selectedDocs : false;
+        const available = Array.isArray(record.strategy) ? record.strategy : [];
+        const normalized = Array.from(
+          new Set(available.map((x) => String(x)).filter(Boolean)),
+        );
+        const canPick = normalized.length > 0;
         return (
           <Space>
             <Button
               type={selected ? "outline" : "primary"}
-              onClick={() => toggleSelectDoc(id)}
+              onClick={() => {
+                if (!id) return;
+                if (selected) unselectDoc(id);
+                else openPickStrategy(record);
+              }}
+              disabled={!selected && !canPick}
             >
               {selected
                 ? t("rag.ui.columns.unselect", { _: "取消选择" })
-                : t("rag.ui.columns.select", { _: "选择" })}
+                : !canPick
+                  ? t("rag.ui.columns.unselectable", { _: "不可选择" })
+                  : t("rag.ui.columns.select", { _: "选择" })}
             </Button>
           </Space>
         );
@@ -361,28 +513,37 @@ const Observation: React.FC<Props> = ({
           <Button.Group>
             <Button
               type={scope === "self" ? "primary" : "outline"}
-              onClick={() => setScope("self")}
+              onClick={() => {
+                setScope("self");
+                void fetchRagDocs({ silent: true, scope: "self" });
+              }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
             {!isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
-                onClick={() => setScope("tenant")}
+                onClick={() => {
+                  setScope("tenant");
+                  void fetchRagDocs({ silent: true, scope: "tenant" });
+                }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
             <Button
               type={scope === "system" ? "primary" : "outline"}
-              onClick={() => setScope("system")}
+              onClick={() => {
+                setScope("system");
+                void fetchRagDocs({ silent: true, scope: "system" });
+              }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>
           </Button.Group>
-          <Tag color="arcoblue">
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
             {t("rag.ui.selected.count", { _: "已选择" })}: {selectedDocsText}
-          </Tag>
+          </span>
         </Space>
         <Space>
           <Input
@@ -406,6 +567,47 @@ const Observation: React.FC<Props> = ({
         rowKey="id"
         pagination={false}
       />
+      <Modal
+        title={t("rag.ui.strategySelect", { _: "选择切割策略" })}
+        visible={pickStrategyVisible}
+        onCancel={() => {
+          setPickStrategyVisible(false);
+          setPickStrategyDoc(null);
+          setPickStrategyValues([]);
+        }}
+        onOk={confirmPickStrategy}
+      >
+        <div style={{ display: "grid", rowGap: 12 }}>
+          <div style={{ color: "var(--color-text-2)" }}>
+            {t("rag.ui.strategySelectTip", {
+              _: "请选择该文档绑定到智能体时使用的切割策略（可多选）",
+            })}
+          </div>
+          <Select
+            mode="multiple"
+            allowClear
+            style={{ width: "100%" }}
+            value={pickStrategyValues}
+            onChange={(vals) => {
+              const next = (vals as unknown[]).map((v) => String(v));
+              setPickStrategyValues(next);
+            }}
+          >
+            {(pickStrategyDoc && Array.isArray(pickStrategyDoc.strategy)
+              ? pickStrategyDoc.strategy
+              : []
+            ).map((sid) => {
+              const key = String(sid);
+              const opt = getStrategyOption(key);
+              return (
+                <Select.Option key={key} value={key}>
+                  {opt?.label || `策略 ${key}`}
+                </Select.Option>
+              );
+            })}
+          </Select>
+        </div>
+      </Modal>
     </Card>
   );
 
@@ -623,9 +825,13 @@ const Observation: React.FC<Props> = ({
       name?: string | null;
       summary?: string | null;
       content?: string | null;
+      meta?: Record<string, unknown> | null;
     }>
   >([]);
   const [recordId, setRecordId] = useState<number | null>(null);
+  const [recordMeta, setRecordMeta] = useState<Record<string, unknown> | null>(
+    null,
+  );
 
   const sendMessage = async () => {
     if (!input || !agentId) return;
@@ -634,10 +840,9 @@ const Observation: React.FC<Props> = ({
     setSending(true);
     const controller = new AbortController();
     try {
-      const meta: Record<string, unknown> = {
-        uid: identity?.id,
-        ts: Date.now(),
-      };
+      const meta: Record<string, unknown> =
+        recordMeta ?? ({ uid: identity?.id, ts: Date.now() } as const);
+      if (!recordMeta) setRecordMeta(meta);
       const type = recordId ? 1 : 0;
       const payload = {
         agent_id: agentNum,
@@ -704,23 +909,64 @@ const Observation: React.FC<Props> = ({
     }
   };
 
-  const loadSessions = async (rid: number) => {
+  const loadSessions = async (
+    rid: number,
+    meta?: Record<string, unknown> | null,
+  ) => {
     try {
       const resp = await listAgentChatSessions({
         agent_id: Number(agentId),
+        meta: meta ?? recordMeta ?? undefined,
         record_id: rid,
         page: 1,
         per_page: 100,
       });
       const rows = resp?.data || [];
-      const mapped = rows.map((it) => {
-        const role =
-          it.role === "user" || it.role === "assistant" || it.role === "system"
-            ? it.role
-            : "assistant";
-        const content = String(it.content ?? it.message ?? it.output ?? "");
-        return { role, content };
-      });
+      const pickText = (v: unknown): string | undefined => {
+        if (typeof v === "string") return v;
+        if (!v || typeof v !== "object") return undefined;
+        const vv = v as Record<string, unknown>;
+        const text = vv.text ?? vv.content ?? vv.message ?? vv.value;
+        return typeof text === "string" ? text : undefined;
+      };
+      const mapped: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [];
+      const getCount = (v: unknown): number => {
+        if (typeof v === "number" && Number.isFinite(v)) return v;
+        if (typeof v === "string") {
+          const n = Number(v);
+          if (Number.isFinite(n)) return n;
+        }
+        return Number.MAX_SAFE_INTEGER;
+      };
+      const orderedRows = [...rows].sort(
+        (a, b) => getCount(a?.count) - getCount(b?.count),
+      );
+      for (const it of orderedRows) {
+        const input = pickText((it as { input?: unknown }).input);
+        const output = pickText((it as { output?: unknown }).output);
+        if (input && input.trim())
+          mapped.push({ role: "user", content: input });
+        if (output && output.trim())
+          mapped.push({ role: "assistant", content: output });
+        if ((!input || !input.trim()) && (!output || !output.trim())) {
+          const role =
+            it.role === "user" ||
+            it.role === "assistant" ||
+            it.role === "system"
+              ? it.role
+              : "assistant";
+          const content = String(
+            pickText((it as { content?: unknown }).content) ??
+              pickText((it as { message?: unknown }).message) ??
+              pickText((it as { zip?: unknown }).zip) ??
+              "",
+          );
+          if (content) mapped.push({ role, content });
+        }
+      }
       setMessages(mapped);
     } catch {
       setMessages([]);
@@ -810,7 +1056,11 @@ const Observation: React.FC<Props> = ({
               width: 120,
               render: (
                 _: unknown,
-                record: { id?: number; record_id?: number },
+                record: {
+                  id?: number;
+                  record_id?: number;
+                  meta?: Record<string, unknown> | null;
+                },
               ) => (
                 <Button
                   type="primary"
@@ -818,7 +1068,8 @@ const Observation: React.FC<Props> = ({
                     const rid = Number(record?.id ?? record?.record_id ?? 0);
                     if (!rid) return;
                     setRecordId(rid);
-                    void loadSessions(rid);
+                    setRecordMeta(record?.meta ?? null);
+                    void loadSessions(rid, record?.meta ?? null);
                     setHistoryOpen(false);
                   }}
                 >

@@ -34,7 +34,9 @@ const EvaluationIndex: React.FC = () => {
     "base" | "rag" | "mcp" | "model"
   >("base");
   const [form] = Form.useForm();
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedDocs, setSelectedDocs] = useState<
+    Record<string, number[] | undefined>
+  >({});
   const [selectedMcpIds, setSelectedMcpIds] = useState<number[]>([]);
   const [modelSource, setModelSource] = useState<
     "system" | "openai" | "custom"
@@ -80,7 +82,7 @@ const EvaluationIndex: React.FC = () => {
     if (!agentId && agents.length > 0) {
       setAgentId(String(agents[0].id ?? ""));
     }
-  }, [agents]);
+  }, [agentId, agents]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -120,13 +122,31 @@ const EvaluationIndex: React.FC = () => {
         const description = String(row?.description ?? "");
         const system_prompt = String(row?.system_prompt ?? "");
         form.setFieldsValue({ name, description, system_prompt, type: "self" });
+        const docMap: Record<string, number[] | undefined> = {};
+        const rawDocs = (row as unknown as { documents?: unknown })?.documents;
+        if (Array.isArray(rawDocs)) {
+          rawDocs.forEach((d) => {
+            const id = String((d as { id?: unknown })?.id ?? "");
+            if (!id) return;
+            const rawStrategy = (d as { strategy?: unknown })?.strategy;
+            const nums = Array.isArray(rawStrategy)
+              ? rawStrategy
+                  .map((x) => Number(x))
+                  .filter((n) => !Number.isNaN(n))
+              : [];
+            docMap[id] = nums.length ? nums : undefined;
+          });
+        }
         const docIds = Array.isArray(row?.document_ids)
-          ? (row?.document_ids as string[])
+          ? (row?.document_ids as unknown[]).map((x) => String(x ?? ""))
           : [];
+        docIds.filter(Boolean).forEach((id) => {
+          if (!(id in docMap)) docMap[id] = undefined;
+        });
         const mcpIds = Array.isArray(row?.mcp_agent_ids)
           ? (row?.mcp_agent_ids as number[])
           : [];
-        setSelectedDocIds(docIds);
+        setSelectedDocs(docMap);
         setSelectedMcpIds(mcpIds);
         const metaObj = (row?.meta ?? {}) as Record<string, unknown>;
         const rawSrc = metaObj["model_source"];
@@ -156,6 +176,11 @@ const EvaluationIndex: React.FC = () => {
     void run();
   }, [agentId, agents, form]);
 
+  const selectedDocIds = useMemo(
+    () => Object.keys(selectedDocs),
+    [selectedDocs],
+  );
+
   const selectedDocsText = useMemo(() => {
     if (!selectedDocIds.length)
       return t("rag.ui.selected.none", { _: "未选择" });
@@ -175,15 +200,6 @@ const EvaluationIndex: React.FC = () => {
       ? String(item.name)
       : t("agent.ui.modelDefault", { _: "系统默认" });
   }, [selectedModelId, modelItems, t, modelSource]);
-
-  const toggleSelectDoc = (id?: string) => {
-    if (!id) return;
-    setSelectedDocIds((prev) => {
-      const exists = prev.includes(id);
-      if (exists) return prev.filter((d) => d !== id);
-      return [...prev, id];
-    });
-  };
 
   const toggleSelectMcp = (id?: number) => {
     if (typeof id !== "number") return;
@@ -571,8 +587,17 @@ const EvaluationIndex: React.FC = () => {
                             description: values.description || undefined,
                             system_prompt: values.system_prompt || undefined,
                             meta: Object.keys(meta).length ? meta : undefined,
-                            document_ids: selectedDocIds.length
-                              ? selectedDocIds
+                            documents: selectedDocIds.length
+                              ? selectedDocIds.map((id) => {
+                                  const s = selectedDocs[id];
+                                  return {
+                                    id,
+                                    strategy:
+                                      Array.isArray(s) && s.length
+                                        ? s
+                                        : undefined,
+                                  };
+                                })
                               : undefined,
                             mcp_agent_ids: selectedMcpIds.length
                               ? selectedMcpIds
@@ -604,8 +629,8 @@ const EvaluationIndex: React.FC = () => {
             {active === "observation" && (
               <Observation
                 active={rightActive}
-                selectedDocIds={selectedDocIds}
-                onToggleSelectDoc={toggleSelectDoc}
+                selectedDocs={selectedDocs}
+                setSelectedDocs={setSelectedDocs}
                 selectedMcpIds={selectedMcpIds}
                 onToggleSelectMcp={toggleSelectMcp}
                 agentId={agentId}

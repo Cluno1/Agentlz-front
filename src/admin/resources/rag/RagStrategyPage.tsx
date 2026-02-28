@@ -38,8 +38,8 @@ const RagStrategyPage: React.FC = () => {
           <Button onClick={() => navigate(-1)}>
             {t("common.back", { _: "返回" })}
           </Button>
-          <Button type="primary" onClick={() => navigate("/rag")}>
-            {t("rag.title", { _: "文档列表" })}
+          <Button type="primary" onClick={() => navigate("/rag/strategy/all")}>
+            {t("rag.ui.strategyOverview", { _: "策略总览" })}
           </Button>
         </Space>
       </div>

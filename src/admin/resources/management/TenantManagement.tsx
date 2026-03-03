@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Title, useGetIdentity, useTranslate } from "react-admin";
+import { Title, usePermissions, useTranslate } from "react-admin";
 import {
   Button,
   Card,
@@ -11,63 +11,61 @@ import {
   Space,
   Switch,
   Table,
-  Tabs,
   Tag,
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
 import {
-  listAnnouncements,
-  createAnnouncement,
-  updateAnnouncement,
-  deleteAnnouncement,
-} from "../../data/api/announcement";
-import type { ListAnnouncementsNameSpace } from "../../data/api/announcement/type";
+  listTenants,
+  createTenant,
+  updateTenant,
+  deleteTenant,
+} from "../../data/api/system/tenant";
+import type { ListTenantsNameSpace } from "../../data/api/system/tenant/type";
 
-type AnnouncementRow = ListAnnouncementsNameSpace.ListAnnouncementsResult;
-type AnnouncementFormValues = {
-  title: string;
-  content?: string;
+type TenantRow = ListTenantsNameSpace.ListTenantsResult;
+type TenantFormValues = {
+  id?: string;
+  name: string;
   disabled?: boolean;
 };
 
-export const SystemManagement = () => {
+const TenantManagement: React.FC = () => {
   const t = useTranslate();
-  const { identity } = useGetIdentity();
-  const tenantKey = import.meta.env.VITE_TENANT_ID as string;
-  const tenantId = localStorage.getItem(tenantKey) || "default";
-  const isAdmin = String(identity?.role || "") === "admin";
-  const canSystem = isAdmin && tenantId === "system";
-  const canTenant = isAdmin && tenantId !== "default" && tenantId !== "system";
-  const initialScope = canSystem ? "system" : canTenant ? "tenant" : "tenant";
-  const [scope, setScope] = useState<"system" | "tenant">(initialScope);
-  const [rows, setRows] = useState<AnnouncementRow[]>([]);
-  const [total, setTotal] = useState(0);
+  const { permissions } = usePermissions();
   const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<TenantRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const [editing, setEditing] = useState<AnnouncementRow | null>(null);
+  const [editing, setEditing] = useState<TenantRow | null>(null);
   const [form] = Form.useForm();
 
-  const canView = useMemo(() => canSystem || canTenant, [canSystem, canTenant]);
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isSuperAdmin = useMemo(
+    () =>
+      permissions === "admin" &&
+      (tenantId === "system" || tenantId === "default"),
+    [permissions, tenantId],
+  );
 
   const fetchList = React.useCallback(
     async (resetPage?: boolean) => {
-      if (!canView) return;
+      if (!isSuperAdmin) return;
       const nextPage = resetPage ? 1 : page;
       if (resetPage) setPage(1);
       try {
         setLoading(true);
-        const resp = await listAnnouncements({
+        const resp = await listTenants({
           page: nextPage,
           perPage: pageSize,
           sortField: "id",
           sortOrder: "DESC",
           filter: { q: keyword },
-          type: scope,
         });
         setRows(resp.data || []);
         setTotal(resp.total || 0);
@@ -77,12 +75,12 @@ export const SystemManagement = () => {
         setLoading(false);
       }
     },
-    [canView, page, pageSize, keyword, scope, t],
+    [isSuperAdmin, page, pageSize, keyword, t],
   );
 
   useEffect(() => {
     fetchList(true);
-  }, [fetchList, scope]);
+  }, [fetchList]);
 
   useEffect(() => {
     fetchList();
@@ -92,36 +90,33 @@ export const SystemManagement = () => {
     setModalMode("create");
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ title: "", content: "", disabled: false });
+    form.setFieldsValue({ id: "", name: "", disabled: false });
     setModalVisible(true);
   };
 
-  const openEdit = (row: AnnouncementRow) => {
+  const openEdit = (row: TenantRow) => {
     setModalMode("edit");
     setEditing(row);
     form.setFieldsValue({
-      title: row.title,
-      content: row.content,
+      id: row.id,
+      name: row.name,
       disabled: !!row.disabled,
     });
     setModalVisible(true);
   };
 
-  const submitForm = async (values: AnnouncementFormValues) => {
+  const submitForm = async (values: TenantFormValues) => {
     try {
       if (modalMode === "create") {
-        const tid = scope === "system" ? "system" : tenantId;
-        await createAnnouncement({
-          tenant_id: tid,
-          title: values.title,
-          content: values.content,
+        await createTenant({
+          id: values.id || undefined,
+          name: values.name,
           disabled: values.disabled,
         });
         Message.success(t("system.msg.createOk", { _: "创建成功" }));
       } else if (editing?.id) {
-        await updateAnnouncement(Number(editing.id), {
-          title: values.title,
-          content: values.content,
+        await updateTenant(String(editing.id), {
+          name: values.name,
           disabled: values.disabled,
         });
         Message.success(t("system.msg.updateOk", { _: "更新成功" }));
@@ -137,9 +132,9 @@ export const SystemManagement = () => {
     }
   };
 
-  const handleDelete = async (row: AnnouncementRow) => {
+  const handleDelete = async (row: TenantRow) => {
     try {
-      await deleteAnnouncement(Number(row.id));
+      await deleteTenant(String(row.id));
       Message.success(t("system.msg.deleteOk", { _: "删除成功" }));
       fetchList();
     } catch (e: unknown) {
@@ -151,23 +146,19 @@ export const SystemManagement = () => {
     }
   };
 
-  const columns: TableColumnProps<AnnouncementRow>[] = [
+  const columns: TableColumnProps<TenantRow>[] = [
     {
-      title: t("system.announcement.title", { _: "标题" }),
-      dataIndex: "title",
+      title: t("system.tenant.columns.id", { _: "租户ID" }),
+      dataIndex: "id",
       width: 220,
     },
     {
-      title: t("system.announcement.content", { _: "内容" }),
-      dataIndex: "content",
-      render: (val: string) => (
-        <Typography.Paragraph ellipsis={{ rows: 2, expandable: false }}>
-          {val || "-"}
-        </Typography.Paragraph>
-      ),
+      title: t("system.tenant.columns.name", { _: "名称" }),
+      dataIndex: "name",
+      width: 180,
     },
     {
-      title: t("system.announcement.status", { _: "状态" }),
+      title: t("system.tenant.columns.status", { _: "状态" }),
       dataIndex: "disabled",
       width: 120,
       render: (val: boolean) =>
@@ -178,15 +169,20 @@ export const SystemManagement = () => {
         ),
     },
     {
-      title: t("system.announcement.updatedAt", { _: "更新时间" }),
+      title: t("system.tenant.columns.createdAt", { _: "创建时间" }),
+      dataIndex: "created_at",
+      width: 180,
+    },
+    {
+      title: t("system.tenant.columns.updatedAt", { _: "更新时间" }),
       dataIndex: "updated_at",
       width: 180,
     },
     {
-      title: t("system.announcement.action", { _: "操作" }),
+      title: t("system.tenant.columns.action", { _: "操作" }),
       dataIndex: "actions",
       width: 180,
-      render: (_: unknown, row: AnnouncementRow) => (
+      render: (_: unknown, row: TenantRow) => (
         <Space>
           <Button size="mini" onClick={() => openEdit(row)}>
             {t("common.edit", { _: "编辑" })}
@@ -204,10 +200,10 @@ export const SystemManagement = () => {
     },
   ];
 
-  if (!canView) {
+  if (!isSuperAdmin) {
     return (
       <div>
-        <Title title={t("system.title", { _: "系统管理" })} />
+        <Title title={t("system.tenant.title", { _: "租户管理" })} />
         <Card>
           <Typography.Text>
             {t("system.msg.noPermission", { _: "无权限访问" })}
@@ -219,29 +215,9 @@ export const SystemManagement = () => {
 
   return (
     <div>
-      <Title title={t("system.title", { _: "系统管理" })} />
+      <Title title={t("system.tenant.title", { _: "租户管理" })} />
       <Card>
-        <Space direction="vertical" style={{ width: "100%" }} size="large">
-          <Tabs
-            activeTab={scope}
-            onChange={(key) =>
-              setScope((key as "system" | "tenant") || "tenant")
-            }
-            type="line"
-          >
-            {canSystem && (
-              <Tabs.TabPane
-                key="system"
-                title={t("system.announcement.system", { _: "系统公告" })}
-              />
-            )}
-            {canTenant && (
-              <Tabs.TabPane
-                key="tenant"
-                title={t("system.announcement.tenant", { _: "租户公告" })}
-              />
-            )}
-          </Tabs>
+        <Space direction="vertical" size="large" style={{ width: "100%" }}>
           <Space style={{ width: "100%", justifyContent: "space-between" }}>
             <Space>
               <Input
@@ -257,7 +233,7 @@ export const SystemManagement = () => {
               </Button>
             </Space>
             <Button type="primary" onClick={openCreate}>
-              {t("system.announcement.create", { _: "新建公告" })}
+              {t("system.tenant.create", { _: "新建租户" })}
             </Button>
           </Space>
           <Table
@@ -281,28 +257,34 @@ export const SystemManagement = () => {
         visible={modalVisible}
         title={
           modalMode === "create"
-            ? t("system.announcement.create", { _: "新建公告" })
-            : t("system.announcement.edit", { _: "编辑公告" })
+            ? t("system.tenant.create", { _: "新建租户" })
+            : t("system.tenant.edit", { _: "编辑租户" })
         }
         onCancel={() => setModalVisible(false)}
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onSubmit={submitForm}>
+          {modalMode === "create" && (
+            <Form.Item
+              label={t("system.tenant.columns.id", { _: "租户ID" })}
+              field="id"
+            >
+              <Input
+                placeholder={t("system.tenant.idOptional", {
+                  _: "可选，留空自动生成",
+                })}
+              />
+            </Form.Item>
+          )}
           <Form.Item
-            label={t("system.announcement.title", { _: "标题" })}
-            field="title"
+            label={t("system.tenant.columns.name", { _: "名称" })}
+            field="name"
             rules={[{ required: true }]}
           >
             <Input />
           </Form.Item>
           <Form.Item
-            label={t("system.announcement.content", { _: "内容" })}
-            field="content"
-          >
-            <Input.TextArea rows={4} />
-          </Form.Item>
-          <Form.Item
-            label={t("system.announcement.status", { _: "状态" })}
+            label={t("system.tenant.columns.status", { _: "状态" })}
             field="disabled"
             triggerPropName="checked"
           >
@@ -316,3 +298,5 @@ export const SystemManagement = () => {
     </div>
   );
 };
+
+export default TenantManagement;

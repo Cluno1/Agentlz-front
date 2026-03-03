@@ -31,6 +31,8 @@ import type {
   AgentChatInput,
   AgentChatStreamChunk,
 } from "../../../data/api/agent/type";
+import { wsClient } from "../../../data/wsClient";
+import type { WSMessage } from "../../../data/wsClient";
 
 type ApiAgentRow = {
   id?: number | string;
@@ -104,6 +106,81 @@ const Evaluation: React.FC = () => {
   useEffect(() => {
     fetchAgents("");
   }, [fetchAgents]);
+
+  const wsTopic = useMemo(() => {
+    const uid = identity?.id ? String(identity.id) : "";
+    return uid ? `evaluation:user:${uid}` : "evaluation:global";
+  }, [identity?.id]);
+
+  const handleWsMessage = React.useCallback(
+    (msg: WSMessage) => {
+      if (!msg || typeof msg.type !== "string") return;
+      if (msg.type === "evaluation.started") {
+        setEvaluating(true);
+        return;
+      }
+      if (msg.type === "evaluation.done") {
+        setEvaluating(false);
+        return;
+      }
+      if (msg.type !== "evaluation.item_done") return;
+      const data = (msg.data || {}) as {
+        row_id?: string | number;
+        row_index?: number;
+        question?: string;
+        expected?: string;
+        answer?: string;
+        time_ms?: number;
+        correct?: boolean;
+      };
+      const rowId =
+        data.row_id !== undefined
+          ? String(data.row_id)
+          : typeof data.row_index === "number"
+            ? String(data.row_index)
+            : "";
+      setRows((prev) => {
+        const copy = [...prev];
+        let idx = -1;
+        if (rowId) idx = copy.findIndex((x) => x.id === rowId);
+        if (idx === -1 && typeof data.row_index === "number") {
+          idx =
+            data.row_index >= 0 && data.row_index < copy.length
+              ? data.row_index
+              : -1;
+        }
+        if (idx !== -1) {
+          copy[idx] = {
+            ...copy[idx],
+            answer: data.answer ?? copy[idx].answer,
+            timeMs: data.time_ms ?? copy[idx].timeMs,
+            correct: data.correct ?? copy[idx].correct,
+          };
+          return copy;
+        }
+        if (data.question || data.answer) {
+          copy.push({
+            id: rowId || `${copy.length + 1}`,
+            question: data.question || "",
+            expected: data.expected,
+            answer: data.answer,
+            timeMs: data.time_ms,
+            correct: data.correct,
+            data: {},
+          });
+        }
+        return copy;
+      });
+    },
+    [setRows],
+  );
+
+  useEffect(() => {
+    wsClient.subscribe(wsTopic, handleWsMessage);
+    return () => {
+      wsClient.unsubscribe(wsTopic, handleWsMessage);
+    };
+  }, [wsTopic, handleWsMessage]);
 
   const runAgentSearch = React.useCallback(() => {
     const q = agentQuery.trim();

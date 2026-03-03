@@ -77,6 +77,7 @@ export default {
       email: "邮箱",
       fullName: "姓名",
       role: "角色",
+      tenant: "租户",
       disabled: "禁用登录",
       createdAt: "创建时间",
       operations: "操作",
@@ -99,6 +100,7 @@ export default {
         fullName: "姓名",
         role: "角色",
         avatar: "头像链接",
+        tenant: "租户",
         disabled: "禁用登录",
         createdAt: "创建时间",
       },
@@ -118,6 +120,7 @@ export default {
         avatar: "头像链接",
         disabled: "禁用登录",
         password: "密码",
+        tenant: "租户",
       },
       messages: {
         createSuccess: "创建成功",
@@ -140,6 +143,7 @@ export default {
       tabs: {
         self: "个人",
         tenant: "租户",
+        system: "系统",
       },
       create: "创建智能体",
       searchPlaceholder: "按名称/描述搜索",

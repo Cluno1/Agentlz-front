@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Title, useTranslate, useCreatePath } from "react-admin";
+import {
+  Title,
+  useTranslate,
+  useCreatePath,
+  usePermissions,
+} from "react-admin";
 import {
   Card,
   Button,
@@ -41,6 +46,7 @@ const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
 const RagPage: React.FC = () => {
   const t = useTranslate();
+  const { permissions } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const createPath = useCreatePath();
@@ -73,9 +79,18 @@ const RagPage: React.FC = () => {
   const [uploading, setUploading] = useState<boolean>(false);
   const uploadStartedRef = useRef(false);
 
-  const isDefaultTenant =
-    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
-    "default";
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isDefaultTenant = tenantId === "default";
+  const isSuperAdmin = useMemo(() => {
+    const role =
+      typeof permissions === "string"
+        ? permissions
+        : (permissions as any)?.role;
+    return (
+      role === "admin" && (tenantId === "system" || tenantId === "default")
+    );
+  }, [permissions, tenantId]);
 
   useEffect(() => {
     fetchDocs();
@@ -83,7 +98,8 @@ const RagPage: React.FC = () => {
   }, [status, scope, page, pageSize, sortField, sortOrder]);
 
   useEffect(() => {
-    if (isDefaultTenant && scope === "tenant") setScope("self");
+    if ((isDefaultTenant || isSuperAdmin) && scope === "tenant")
+      setScope("self");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -414,7 +430,7 @@ const RagPage: React.FC = () => {
       ),
       width: 80,
     },
-    ...(!isDefaultTenant
+    ...(!isSuperAdmin && !isDefaultTenant
       ? [
           {
             title: t("rag.ui.columns.tenant", { _: "租户" }),
@@ -532,7 +548,7 @@ const RagPage: React.FC = () => {
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => setScope("tenant")}

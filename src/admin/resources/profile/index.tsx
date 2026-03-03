@@ -44,9 +44,20 @@ const ProfileShow = () => {
         if (profile) {
           form.setFieldsValue(profile);
           localStorage.setItem(
-            import.meta.env.IDENTITY_KEY,
-            JSON.stringify(profile),
+            import.meta.env.VITE_IDENTITY_KEY,
+            JSON.stringify({
+              id: profile?.id || "",
+              fullName: profile?.full_name || profile?.username || "",
+              disabled: !!profile?.disabled,
+              email: profile?.email || "",
+              username: profile?.username || "",
+              avatar: profile?.avatar || "",
+              role: profile?.role || "user",
+              createdAt: profile?.created_at || "",
+              createdById: profile?.created_by_id || "",
+            }),
           );
+          localStorage.removeItem("undefined");
         }
         setLoadError(null);
       } catch (e: any) {

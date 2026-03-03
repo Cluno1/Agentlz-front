@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate, useCreatePath } from "react-admin";
+import {
+  Title,
+  useTranslate,
+  useCreatePath,
+  usePermissions,
+} from "react-admin";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -44,12 +49,13 @@ const AgentListPage: React.FC = () => {
   const navigate = useNavigate();
   const createPath = useCreatePath();
   const { cardColorStyle } = useDarkMode();
+  const { permissions } = usePermissions();
   const [agents, setAgents] = useState<ListAgentsNameSpace.ListAgentsResult[]>(
     [],
   );
   const [query, setQuery] = useState<string>("");
   const [status, setStatus] = useState<"all" | "enabled" | "disabled">("all");
-  const [scope, setScope] = useState<"self" | "tenant">("self");
+  const [scope, setScope] = useState<"self" | "tenant" | "system">("self");
   const [loading, setLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -69,14 +75,21 @@ const AgentListPage: React.FC = () => {
   const [apiRecord, setApiRecord] =
     useState<ListAgentsNameSpace.ListAgentsResult | null>(null);
 
-  const isDefaultTenant =
-    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
-    "default";
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isDefaultTenant = tenantId === "default";
+  const isSuperAdmin =
+    permissions === "admin" &&
+    (tenantId === "system" || tenantId === "default");
 
   useEffect(() => {
     fetchAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, page, pageSize, sortField, sortOrder]);
+
+  useEffect(() => {
+    if (isSuperAdmin && scope === "tenant") setScope("self");
+  }, [isSuperAdmin, scope]);
 
   const fetchAgents = async () => {
     setLoading(true);
@@ -404,7 +417,7 @@ const AgentListPage: React.FC = () => {
             >
               {t("agent.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => setScope("tenant")}
@@ -412,6 +425,12 @@ const AgentListPage: React.FC = () => {
                 {t("agent.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
+            <Button
+              type={scope === "system" ? "primary" : "outline"}
+              onClick={() => setScope("system")}
+            >
+              {t("agent.ui.tabs.system", { _: "系统" })}
+            </Button>
           </Button.Group>
         </Space>
         <Button type="primary" onClick={() => navigate("/agent/create")}>

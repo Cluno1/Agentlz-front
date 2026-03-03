@@ -123,6 +123,7 @@ export default {
         fullName: "Full Name",
         role: "Role",
         avatar: "Avatar URL",
+        tenant: "Tenant",
         disabled: "Disabled Login",
         createdAt: "Created At",
       },
@@ -140,6 +141,7 @@ export default {
         fullName: "Full Name",
         role: "Role",
         avatar: "Avatar URL",
+        tenant: "Tenant",
         disabled: "Disabled Login",
         password: "Password",
       },
@@ -164,6 +166,7 @@ export default {
       tabs: {
         self: "Personal",
         tenant: "Tenant",
+        system: "System",
       },
       create: "Create Agent",
       searchPlaceholder: "Search by name/description",

@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Title, useTranslate } from "react-admin";
+import { Title, useTranslate, usePermissions } from "react-admin";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -31,6 +31,7 @@ const CreateAgent: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
   const { cardColorStyle } = useDarkMode();
+  const { permissions } = usePermissions();
   const [active, setActive] = useState<"base" | "rag" | "mcp" | "model">(
     "base",
   );
@@ -73,12 +74,16 @@ const CreateAgent: React.FC = () => {
   const [modelPerPage, setModelPerPage] = useState<number>(10);
   const [modelTotal, setModelTotal] = useState<number>(0);
 
-  const isDefaultTenant =
-    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
-    "default";
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isDefaultTenant = tenantId === "default";
+  const isSuperAdmin =
+    permissions === "admin" &&
+    (tenantId === "system" || tenantId === "default");
 
   useEffect(() => {
-    if (isDefaultTenant && scope === "tenant") setScope("self");
+    if ((isDefaultTenant || isSuperAdmin) && scope === "tenant")
+      setScope("self");
   }, []);
 
   useEffect(() => {
@@ -579,7 +584,7 @@ const CreateAgent: React.FC = () => {
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => {
@@ -693,7 +698,7 @@ const CreateAgent: React.FC = () => {
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={mcpScope === "tenant" ? "primary" : "outline"}
                 onClick={() => setMcpScope("tenant")}
@@ -898,9 +903,14 @@ const CreateAgent: React.FC = () => {
                     <Radio value="self">
                       {t("rag.ui.tabs.self", { _: "个人" })}
                     </Radio>
-                    {!isDefaultTenant && (
+                    {!isSuperAdmin && !isDefaultTenant && (
                       <Radio value="tenant">
                         {t("rag.ui.tabs.tenant", { _: "租户" })}
+                      </Radio>
+                    )}
+                    {isSuperAdmin && (
+                      <Radio value="system">
+                        {t("rag.ui.tabs.system", { _: "系统" })}
                       </Radio>
                     )}
                   </Radio.Group>

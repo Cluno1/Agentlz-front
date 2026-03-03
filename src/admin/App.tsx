@@ -15,6 +15,7 @@ import { UserManagement } from "./resources/management/userManagement";
 import UserCreate from "./resources/management/userManagement/UserCreate";
 import UserEdit from "./resources/management/userManagement/UserEdit";
 import { SystemManagement } from "./resources/management/SystemManagement";
+import TenantManagement from "./resources/management/TenantManagement";
 import ProfilePage from "./resources/profile";
 import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
@@ -39,6 +40,7 @@ import RagStrategyAllPage from "./resources/rag/RagStrategyAllPage";
 import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
 import Evaluation from "./resources/evaluation";
+import { wsClient } from "./data/wsClient";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -77,168 +79,183 @@ const darkTheme = {
   palette: { mode: "dark" },
 };
 
-export const App = () => (
-  <Admin
-    layout={Layout}
-    basename={BASENAME}
-    authProvider={authProvider}
-    dataProvider={dataProvider}
-    i18nProvider={i18nProvider}
-    loginPage={LoginPage}
-    dashboard={DashboardPage}
-    darkTheme={darkTheme}
-  >
-    <Resource
-      name="user-management"
-      list={
-        <ArcoLocaleBridge>
-          <UserManagement />
-        </ArcoLocaleBridge>
-      }
-      create={<UserCreate />}
-      edit={<UserEdit />}
-    />
-    <Resource
-      name="system-management"
-      list={
-        <ArcoLocaleBridge>
-          <SystemManagement />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="profile"
-      list={
-        <ArcoLocaleBridge>
-          <ProfilePage />
-        </ArcoLocaleBridge>
-      }
-      edit={<ProfileEdit />}
-    />
-    <Resource
-      name="create"
-      list={
-        <ArcoLocaleBridge>
-          <CreatePage />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="chat"
-      list={
-        <ArcoLocaleBridge>
-          <Chat />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="agent"
-      list={
-        <ArcoLocaleBridge>
-          <Agent />
-        </ArcoLocaleBridge>
-      }
-    />
+export const App = () => {
+  useEffect(() => {
+    wsClient.connect();
+    return () => {
+      wsClient.disconnect();
+    };
+  }, []);
 
-    <Resource
-      name="evaluation"
-      list={
-        <ArcoLocaleBridge>
-          <Evaluation />
-        </ArcoLocaleBridge>
-      }
-    />
+  return (
+    <Admin
+      layout={Layout}
+      basename={BASENAME}
+      authProvider={authProvider}
+      dataProvider={dataProvider}
+      i18nProvider={i18nProvider}
+      loginPage={LoginPage}
+      dashboard={DashboardPage}
+      darkTheme={darkTheme}
+    >
+      <Resource
+        name="user-management"
+        list={
+          <ArcoLocaleBridge>
+            <UserManagement />
+          </ArcoLocaleBridge>
+        }
+        create={<UserCreate />}
+        edit={<UserEdit />}
+      />
+      <Resource
+        name="system-management"
+        list={
+          <ArcoLocaleBridge>
+            <SystemManagement />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="tenant-management"
+        list={
+          <ArcoLocaleBridge>
+            <TenantManagement />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="profile"
+        list={
+          <ArcoLocaleBridge>
+            <ProfilePage />
+          </ArcoLocaleBridge>
+        }
+        edit={<ProfileEdit />}
+      />
+      <Resource
+        name="create"
+        list={
+          <ArcoLocaleBridge>
+            <CreatePage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="chat"
+        list={
+          <ArcoLocaleBridge>
+            <Chat />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="agent"
+        list={
+          <ArcoLocaleBridge>
+            <Agent />
+          </ArcoLocaleBridge>
+        }
+      />
 
-    <Resource
-      name="mcp-tools"
-      list={
-        <ArcoLocaleBridge>
-          <McpToolsPage />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="rag"
-      list={
-        <ArcoLocaleBridge>
-          <RagPage />
-        </ArcoLocaleBridge>
-      }
-      show={
-        <ArcoLocaleBridge>
-          <RagShow />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="mcp"
-      show={
-        <ArcoLocaleBridge>
-          <McpShow />
-        </ArcoLocaleBridge>
-      }
-    />
+      <Resource
+        name="evaluation"
+        list={
+          <ArcoLocaleBridge>
+            <Evaluation />
+          </ArcoLocaleBridge>
+        }
+      />
 
-    {/* 公开路由：注册页（不需要认证） */}
+      <Resource
+        name="mcp-tools"
+        list={
+          <ArcoLocaleBridge>
+            <McpToolsPage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="rag"
+        list={
+          <ArcoLocaleBridge>
+            <RagPage />
+          </ArcoLocaleBridge>
+        }
+        show={
+          <ArcoLocaleBridge>
+            <RagShow />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="mcp"
+        show={
+          <ArcoLocaleBridge>
+            <McpShow />
+          </ArcoLocaleBridge>
+        }
+      />
 
-    <CustomRoutes>
-      <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/rag/upload"
-        element={
-          <ArcoLocaleBridge>
-            <RagUploadPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/agent/create"
-        element={
-          <ArcoLocaleBridge>
-            <CreateAgent />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/mcp/create"
-        element={
-          <ArcoLocaleBridge>
-            <McpCreatePage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/rag/:id/chunks"
-        element={
-          <ArcoLocaleBridge>
-            <ChunkPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/rag/:id/chunks/:strategy"
-        element={
-          <ArcoLocaleBridge>
-            <ChunkShow />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/rag/strategy/all"
-        element={
-          <ArcoLocaleBridge>
-            <RagStrategyAllPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Route
-        path="/rag/strategy/:strategyId"
-        element={
-          <ArcoLocaleBridge>
-            <RagStrategyPage />
-          </ArcoLocaleBridge>
-        }
-      />
-    </CustomRoutes>
-  </Admin>
-);
+      <CustomRoutes>
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/rag/upload"
+          element={
+            <ArcoLocaleBridge>
+              <RagUploadPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/agent/create"
+          element={
+            <ArcoLocaleBridge>
+              <CreateAgent />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/mcp/create"
+          element={
+            <ArcoLocaleBridge>
+              <McpCreatePage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/:id/chunks"
+          element={
+            <ArcoLocaleBridge>
+              <ChunkPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/:id/chunks/:strategy"
+          element={
+            <ArcoLocaleBridge>
+              <ChunkShow />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/strategy/all"
+          element={
+            <ArcoLocaleBridge>
+              <RagStrategyAllPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/strategy/:strategyId"
+          element={
+            <ArcoLocaleBridge>
+              <RagStrategyPage />
+            </ArcoLocaleBridge>
+          }
+        />
+      </CustomRoutes>
+    </Admin>
+  );
+};

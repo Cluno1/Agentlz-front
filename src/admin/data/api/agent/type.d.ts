@@ -27,7 +27,7 @@ export interface AgentDocumentBinding {
 export namespace ListAgentsNameSpace {
   /** @description Agent 列表 参数 */
   export interface ListAgentsParams extends PaginationParams {
-    type?: "self" | "tenant";
+    type?: "self" | "tenant" | "system";
     [k: string]: any;
   }
 

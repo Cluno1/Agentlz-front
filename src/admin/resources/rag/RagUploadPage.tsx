@@ -5,7 +5,6 @@ import {
   Card,
   Upload,
   Button,
-  Message,
   Space,
   Input,
   Select,
@@ -15,7 +14,6 @@ import {
 import { IconUpload, IconRefresh } from "@arco-design/web-react/icon";
 import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
 import { useNavigate } from "react-router-dom";
-import { createDocument } from "../../data/api/rag";
 import { strategyOptions } from "./strategyOptions";
 
 const RagUploadPage: React.FC = () => {
@@ -52,52 +50,28 @@ const RagUploadPage: React.FC = () => {
     },
   ];
 
-  const toArrayBuffer = (file: File) =>
-    new Promise<ArrayBuffer>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as ArrayBuffer);
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-
-  const inferDocType = (file: File) => {
-    const ext = (file.name.split(".").pop() || "").toLowerCase();
-    return ext || file.type || "txt";
-  };
   const handleUpload = async () => {
-    try {
-      setUploading(true);
-      const file = fileList[0]?.originFile as File;
-      if (!file) return;
-
-      const arrayBuffer = await toArrayBuffer(file);
-      const blob = new Blob([arrayBuffer], { type: file.type });
-
-      const formData = new FormData();
-      formData.append("document", blob, file.name);
-      formData.append("document_type", inferDocType(file));
-      formData.append("title", fileName || file.name);
-      formData.append("type", docType);
-      if (strategies && strategies.length) {
-        formData.append("strategy", JSON.stringify(strategies));
-      }
-      if (description) formData.append("description", description);
-      if (tags) {
-        const tagArray = tags.split(/[,\s]+/).filter(Boolean);
-        if (tagArray.length) {
-          formData.append("tags", JSON.stringify(tagArray));
-        }
-      }
-
-      await createDocument(formData);
-
-      Message.success(t("rag.msg.uploadSuccess", { _: "上传成功，正在解析" }));
-      navigate("/rag");
-    } catch (e: any) {
-      Message.error(e?.message || t("rag.msg.uploadError", { _: "上传失败" }));
-    } finally {
+    setUploading(true);
+    const file = fileList[0]?.originFile as File;
+    if (!file) {
       setUploading(false);
+      return;
     }
+    const tagArray = tags.split(/[,\s]+/).filter(Boolean);
+    navigate("/rag", {
+      state: {
+        uploadFrom: "ragUpload",
+        file,
+        uploadParams: {
+          type: docType,
+          title: fileName || file.name,
+          description,
+          tags: tagArray,
+          strategy: strategies,
+        },
+      },
+    });
+    setUploading(false);
   };
 
   return (
@@ -109,7 +83,7 @@ const RagUploadPage: React.FC = () => {
         drag
         autoUpload={false}
         fileList={fileList}
-        accept=".pdf,.doc,.docx,.md,.txt,.ppt,.pptx,.xls,.xlsx,.csv"
+        accept=".pdf,.doc,.docx,.md,.txt,.ppt,.pptx,.xls,.xlsx,.csv,.mp4,.mov,.avi,.mkv"
         onChange={(list: UploadItem[]) => {
           setFileList(list);
           if (list.length > 0 && list[0].originFile) {

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Title, useTranslate, useCreatePath } from "react-admin";
 import {
   Card,
@@ -15,6 +15,7 @@ import {
   Form,
   Popover,
   Switch,
+  Progress,
 } from "@arco-design/web-react";
 import {
   IconUpload,
@@ -24,7 +25,7 @@ import {
   IconDelete,
   IconEye,
 } from "@arco-design/web-react/icon";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   listDocuments,
   updateDocument,
@@ -33,12 +34,15 @@ import {
 import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
 import { useDarkMode } from "../../data/hook/useDark";
 import { getStrategyOption } from "./strategyOptions";
+import { uploadFileForRag, cancelUpload } from "../../utils/upload/uploader";
+import type { UploadStatus, UploadTaskState } from "../../utils/upload/types";
 
 const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
 const RagPage: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
+  const location = useLocation();
   const createPath = useCreatePath();
   const { cardColorStyle } = useDarkMode();
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
@@ -63,6 +67,11 @@ const RagPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [sortField, setSortField] = useState<string>("id");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadState, setUploadState] = useState<UploadTaskState | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const uploadStartedRef = useRef(false);
 
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
@@ -78,8 +87,79 @@ const RagPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (uploadStartedRef.current) return;
+    const state = location.state as any;
+    if (state && state.uploadFrom === "ragUpload" && state.file) {
+      uploadStartedRef.current = true;
+      navigate(location.pathname, { replace: true });
+      const params = state.uploadParams || {};
+      (async () => {
+        try {
+          setUploading(true);
+          await uploadFileForRag(state.file as File, params, {
+            onStatus: (next) => {
+              setUploadStatus(next);
+              if (next === "uploading") {
+                setUploadProgress(0);
+              }
+            },
+            onProgress: (p) => {
+              setUploadProgress(p.percent);
+            },
+            onTaskReady: (taskState) => {
+              setUploadState(taskState);
+            },
+          });
+          Message.success(
+            t("rag.msg.uploadSuccess", { _: "上传成功，等待扫描与解析" }),
+          );
+        } catch (e: any) {
+          Message.error(
+            e?.message || t("rag.msg.uploadError", { _: "上传失败" }),
+          );
+        } finally {
+          setUploading(false);
+          setUploadStatus("idle");
+          setUploadProgress(0);
+          setUploadState(null);
+          uploadStartedRef.current = false;
+        }
+      })();
+    }
+  }, [location, navigate, t]);
+
+  const uploadStatusText = useMemo(() => {
+    if (uploadStatus === "hashing")
+      return t("rag.msg.hashing", { _: "计算文件指纹" });
+    if (uploadStatus === "uploading")
+      return t("rag.msg.uploading", { _: "上传中" });
+    if (uploadStatus === "waiting_scan")
+      return t("rag.msg.waitScan", { _: "等待安全扫描" });
+    if (uploadStatus === "processing")
+      return t("rag.msg.processing", { _: "解析中" });
+    if (uploadStatus === "completed") return t("rag.msg.done", { _: "完成" });
+    if (uploadStatus === "failed") return t("rag.msg.failed", { _: "失败" });
+    return "";
+  }, [t, uploadStatus]);
+
   const openUploadPage = () => {
     navigate("/rag/upload");
+  };
+
+  const handleCancelUpload = async () => {
+    if (!uploadState) return;
+    try {
+      await cancelUpload(uploadState);
+      setUploadStatus("failed");
+      Message.info(t("rag.msg.cancelled", { _: "已取消上传" }));
+    } catch (e: any) {
+      Message.error(
+        e?.message || t("rag.msg.cancelError", { _: "取消上传失败" }),
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   const fetchDocs = async () => {
@@ -404,6 +484,39 @@ const RagPage: React.FC = () => {
 
   return (
     <div style={{ paddingTop: "30px" }}>
+      {uploadStatusText && (
+        <Card
+          bordered
+          style={{
+            marginBottom: 16,
+          }}
+        >
+          <Space
+            align="center"
+            style={{ width: "100%", justifyContent: "space-between" }}
+          >
+            <div>
+              <div style={{ marginBottom: 8 }}>{uploadStatusText}</div>
+              <Progress
+                percent={uploadProgress}
+                style={{ minWidth: 260, maxWidth: 480 }}
+              />
+            </div>
+            <Button
+              type="primary"
+              status="danger"
+              onClick={handleCancelUpload}
+              disabled={
+                !uploadState ||
+                !["hashing", "uploading"].includes(uploadStatus) ||
+                !uploading
+              }
+            >
+              {t("rag.ui.cancel", { _: "取消上传" })}
+            </Button>
+          </Space>
+        </Card>
+      )}
       <div
         style={{
           display: "flex",

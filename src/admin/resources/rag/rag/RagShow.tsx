@@ -14,7 +14,7 @@ import {
   Divider,
 } from "@arco-design/web-react";
 import { IconDownload, IconEye } from "@arco-design/web-react/icon";
-import { useDarkMode } from "../../data/hook/useDark";
+import { useDarkMode } from "../../../data/hook/useDark";
 
 const RagShow: React.FC = () => {
   const { id } = useParams<{ id: string }>();

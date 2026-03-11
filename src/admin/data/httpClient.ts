@@ -28,7 +28,13 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (tenantId && config.headers) {
-    config.headers["X-Tenant-ID"] = tenantId;
+    const headers: any = config.headers;
+    const alreadySet =
+      typeof headers["X-Tenant-ID"] !== "undefined" ||
+      typeof headers["x-tenant-id"] !== "undefined";
+    if (!alreadySet) {
+      headers["X-Tenant-ID"] = tenantId;
+    }
   }
 
   return config;

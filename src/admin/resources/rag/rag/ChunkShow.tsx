@@ -13,9 +13,9 @@ import {
   Message,
 } from "@arco-design/web-react";
 import { IconEye } from "@arco-design/web-react/icon";
-import { useDarkMode } from "../../data/hook/useDark";
-import { listDocumentStrategyChunks, getDocument } from "../../data/api/rag";
-import type { ListDocStrategiesNameSpace } from "../../data/api/rag/type";
+import { useDarkMode } from "../../../data/hook/useDark";
+import { listDocumentStrategyChunks, getDocument } from "../../../data/api/rag";
+import type { ListDocStrategiesNameSpace } from "../../../data/api/rag/type";
 
 type ChunkItem = {
   index: number;

@@ -178,6 +178,7 @@ async function ensureTaskState(
     description?: string;
     tags?: string[];
     strategy?: string[];
+    is_evaluation?: boolean;
   },
   fileType: string,
 ): Promise<{
@@ -263,6 +264,7 @@ async function ensureTaskState(
       tags: normalizeTags(params.tags),
       strategy: normalizeStrategy(params.strategy),
       document_type: inferDocumentType(file),
+      is_evaluation: params.is_evaluation,
     },
     perReqConfig,
   );
@@ -295,6 +297,7 @@ async function ensureTaskState(
     description: params.description,
     tags: normalizeTags(params.tags),
     strategy: normalizeStrategy(params.strategy),
+    isEvaluation: !!params.is_evaluation,
     uploadedParts: [],
     partRecords: [],
     nextOffset: 0,
@@ -316,6 +319,7 @@ export async function uploadFileForRag(
     tags?: string[];
     strategy?: string[];
     fileType?: string;
+    is_evaluation?: boolean;
   },
   callbacks?: UploadCallbacks,
 ): Promise<UploadResult> {
@@ -348,6 +352,9 @@ export async function uploadFileForRag(
     formData.append("document_type", inferDocumentType(file));
     formData.append("title", params.title || file.name);
     formData.append("type", params.type);
+    if (params.is_evaluation) {
+      formData.append("is_evaluation", "true");
+    }
     if (params.strategy && params.strategy.length) {
       formData.append("strategy", JSON.stringify(params.strategy));
     }
@@ -383,6 +390,7 @@ export async function uploadFileForRag(
       description: params.description,
       tags: params.tags,
       strategy: params.strategy,
+      is_evaluation: params.is_evaluation,
     },
     fileType,
   );

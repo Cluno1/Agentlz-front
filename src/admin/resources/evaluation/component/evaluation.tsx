@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslate, useGetIdentity } from "react-admin";
 import {
   Card,
-  Upload,
   Button,
   Message,
   Space,
@@ -11,26 +10,24 @@ import {
   Table,
   Tag,
   Spin,
-  Divider,
-  Grid,
-  Statistic,
-  Progress,
-  Avatar,
-  Tooltip,
   Typography,
+  Modal,
 } from "@arco-design/web-react";
-import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
 import {
   IconUpload,
   IconRefresh,
-  IconCheckCircle,
-  IconCloseCircle,
+  IconHistory,
 } from "@arco-design/web-react/icon";
-import { listAccessibleAgents, chatAgentStream } from "../../../data/api/agent";
-import type {
-  AgentChatInput,
-  AgentChatStreamChunk,
-} from "../../../data/api/agent/type";
+import { useNavigate } from "react-router-dom";
+import { listAccessibleAgents } from "../../../data/api/agent";
+import {
+  getEvaluationContent,
+  listAgentContents,
+  listAgentVersions,
+  listEvaluationDatasets,
+  startEvaluation,
+} from "../../../data/api/evaluation";
+import type { EvaluationNameSpace } from "../../../data/api/evaluation/type";
 import { wsClient } from "../../../data/wsClient";
 import type { WSMessage } from "../../../data/wsClient";
 
@@ -45,12 +42,12 @@ type ApiAgentRow = {
 
 type EvalRow = {
   id: string;
-  data: Record<string, string>;
-  question: string;
-  expected?: string;
-  answer?: string;
-  timeMs?: number;
-  correct?: boolean;
+  instruction?: string;
+  input?: string;
+  output?: string;
+  fact_output?: string;
+  score?: number;
+  opinion?: string;
 };
 
 const Evaluation: React.FC = () => {
@@ -61,50 +58,59 @@ const Evaluation: React.FC = () => {
   >([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
-  const [agentQuery, setAgentQuery] = useState<string>("");
-  const [selectOpen, setSelectOpen] = useState(false);
-
-  const [fileList, setFileList] = useState<UploadItem[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const navigate = useNavigate();
   const [rows, setRows] = useState<EvalRow[]>([]);
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [questionCol, setQuestionCol] = useState<string>("");
-  const [answerCol, setAnswerCol] = useState<string>("");
   const [evaluating, setEvaluating] = useState(false);
-  const abortCtrlRef = useRef<AbortController | null>(null);
-
-  const headers = useMemo(() => csvHeaders, [csvHeaders]);
-
-  const fetchAgents = React.useCallback(
-    async (q: string) => {
-      try {
-        setAgentsLoading(true);
-        const resp = await listAccessibleAgents({
-          page: 1,
-          perPage: 50,
-          filter: { q },
-        });
-        const mapped = (resp?.data ?? [])
-          .map((a: ApiAgentRow) => ({
-            id: String(a.id ?? a.agent_id ?? ""),
-            name: a.name ?? "",
-            description: a.description ?? "",
-            avatar: a.avatar ?? "",
-          }))
-          .filter((a: { id: string }) => !!a.id);
-        setAgents(mapped);
-        if (!agentId && mapped.length) setAgentId(mapped[0].id);
-      } catch {
-        Message.error(t("agent.msg.loadAgentsFail", { _: "加载失败" }));
-      } finally {
-        setAgentsLoading(false);
-      }
-    },
-    [t, agentId],
+  const [datasetType, setDatasetType] = useState<"self" | "tenant" | "system">(
+    "tenant",
   );
+  const [datasetQuery, setDatasetQuery] = useState("");
+  const [datasets, setDatasets] = useState<
+    EvaluationNameSpace.EvaluationDataset[]
+  >([]);
+  const [datasetLoading, setDatasetLoading] = useState(false);
+  const [selectedDatasetId, setSelectedDatasetId] = useState("");
+  const [currentContentId, setCurrentContentId] = useState<number | null>(null);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [versions, setVersions] = useState<
+    EvaluationNameSpace.EvaluationVersion[]
+  >([]);
+  const [contents, setContents] = useState<
+    EvaluationNameSpace.EvaluationContent[]
+  >([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<
+    number | undefined
+  >(undefined);
+  const [contentPreview, setContentPreview] = useState<string>("");
+  const [contentPreviewVisible, setContentPreviewVisible] = useState(false);
+
+  const fetchAgents = React.useCallback(async () => {
+    try {
+      setAgentsLoading(true);
+      const resp = await listAccessibleAgents({
+        page: 1,
+        perPage: 50,
+      });
+      const mapped = (resp?.data ?? [])
+        .map((a: ApiAgentRow) => ({
+          id: String(a.id ?? a.agent_id ?? ""),
+          name: a.name ?? "",
+          description: a.description ?? "",
+          avatar: a.avatar ?? "",
+        }))
+        .filter((a: { id: string }) => !!a.id);
+      setAgents(mapped);
+      if (!agentId && mapped.length > 0) setAgentId(mapped[0].id);
+    } catch {
+      Message.error(t("agent.msg.loadAgentsFail", { _: "加载失败" }));
+    } finally {
+      setAgentsLoading(false);
+    }
+  }, [t, agentId]);
 
   useEffect(() => {
-    fetchAgents("");
+    fetchAgents();
   }, [fetchAgents]);
 
   const wsTopic = useMemo(() => {
@@ -117,6 +123,11 @@ const Evaluation: React.FC = () => {
       if (!msg || typeof msg.type !== "string") return;
       if (msg.type === "evaluation.started") {
         setEvaluating(true);
+        const contentId = Number(
+          (msg.data as { eva_content_id?: number })?.eva_content_id || 0,
+        );
+        if (contentId > 0) setCurrentContentId(contentId);
+        setRows([]);
         return;
       }
       if (msg.type === "evaluation.done") {
@@ -125,54 +136,30 @@ const Evaluation: React.FC = () => {
       }
       if (msg.type !== "evaluation.item_done") return;
       const data = (msg.data || {}) as {
-        row_id?: string | number;
-        row_index?: number;
-        question?: string;
-        expected?: string;
-        answer?: string;
-        time_ms?: number;
-        correct?: boolean;
+        eva_content_id?: number;
+        item?: EvalRow;
       };
-      const rowId =
-        data.row_id !== undefined
-          ? String(data.row_id)
-          : typeof data.row_index === "number"
-            ? String(data.row_index)
-            : "";
+      if (
+        currentContentId &&
+        Number(data.eva_content_id || 0) !== currentContentId
+      )
+        return;
+      const item = data.item || {};
       setRows((prev) => {
-        const copy = [...prev];
-        let idx = -1;
-        if (rowId) idx = copy.findIndex((x) => x.id === rowId);
-        if (idx === -1 && typeof data.row_index === "number") {
-          idx =
-            data.row_index >= 0 && data.row_index < copy.length
-              ? data.row_index
-              : -1;
-        }
-        if (idx !== -1) {
-          copy[idx] = {
-            ...copy[idx],
-            answer: data.answer ?? copy[idx].answer,
-            timeMs: data.time_ms ?? copy[idx].timeMs,
-            correct: data.correct ?? copy[idx].correct,
-          };
-          return copy;
-        }
-        if (data.question || data.answer) {
-          copy.push({
-            id: rowId || `${copy.length + 1}`,
-            question: data.question || "",
-            expected: data.expected,
-            answer: data.answer,
-            timeMs: data.time_ms,
-            correct: data.correct,
-            data: {},
-          });
-        }
-        return copy;
+        const next = [...prev];
+        next.push({
+          id: `${next.length + 1}`,
+          instruction: item.instruction,
+          input: item.input,
+          output: item.output,
+          fact_output: item.fact_output,
+          score: item.score,
+          opinion: item.opinion,
+        });
+        return next;
       });
     },
-    [setRows],
+    [currentContentId],
   );
 
   useEffect(() => {
@@ -182,199 +169,117 @@ const Evaluation: React.FC = () => {
     };
   }, [wsTopic, handleWsMessage]);
 
-  const runAgentSearch = React.useCallback(() => {
-    const q = agentQuery.trim();
-    fetchAgents(q);
-    setSelectOpen(true);
-  }, [agentQuery, fetchAgents]);
-
-  const toText = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-
-  const parseCsv = (text: string) => {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (!lines.length) return [];
-    const headerLine = lines[0];
-    const hs = headerLine.split(",").map((h) => h.trim());
-    setCsvHeaders(hs);
-    const list: EvalRow[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",");
-      const rec: Record<string, string> = {};
-      hs.forEach((h, idx) => {
-        rec[h] = (cols[idx] || "").trim();
-      });
-      const id = `${i}`;
-      list.push({
-        id,
-        data: rec,
-        question: rec[hs[0]] || "",
-        expected: rec[hs[1]] || "",
-      });
-    }
-    return list;
-  };
-
-  const handleUpload = async () => {
-    try {
-      setUploading(true);
-      const file = fileList[0]?.originFile as File;
-      if (!file) return;
-      const ext = (file.name.split(".").pop() || "").toLowerCase();
-      if (ext === "csv") {
-        const text = await toText(file);
-        const parsed = parseCsv(text);
-        setRows(parsed);
-        const hs = Object.keys(parsed[0] || {});
-        const qc =
-          hs.find((h) => h.toLowerCase().includes("question")) || hs[0];
-        const ac =
-          hs.find((h) => h.toLowerCase().includes("answer")) || hs[1] || "";
-        setQuestionCol(qc || "");
-        setAnswerCol(ac || "");
-        Message.success(t("common.success", { _: "解析成功" }));
-      } else {
-        Message.info(
-          t("evaluation.msg.xlsxUnsupported", {
-            _: "暂不支持xlsx解析，请使用CSV",
-          }),
+  const fetchDatasets = React.useCallback(
+    async (q: string) => {
+      try {
+        setDatasetLoading(true);
+        const resp = await listEvaluationDatasets({
+          page: 1,
+          perPage: 200,
+          filter: { q },
+          type: datasetType,
+        });
+        const list = resp?.data ?? [];
+        setDatasets(list);
+        setSelectedDatasetId(
+          (prev) => prev || (list.length > 0 ? String(list[0].id) : ""),
         );
+      } catch {
+        Message.error(
+          t("evaluation.msg.loadDocsFail", { _: "加载测评集失败" }),
+        );
+      } finally {
+        setDatasetLoading(false);
       }
-    } catch (e: unknown) {
-      const msg =
-        typeof e === "object" && e && "message" in e
-          ? (e as { message?: string }).message
-          : undefined;
-      Message.error(msg || t("rag.msg.uploadError", { _: "解析失败" }));
-    } finally {
-      setUploading(false);
+    },
+    [datasetType, t],
+  );
+
+  const getErrorMessage = React.useCallback((err: unknown) => {
+    if (err && typeof err === "object" && "message" in err) {
+      const msg = (err as { message?: unknown }).message;
+      return typeof msg === "string" ? msg : "";
     }
-  };
+    return "";
+  }, []);
 
-  const normalize = (s?: string) =>
-    String(s || "")
-      .toLowerCase()
-      .replace(/[\s\r\n]+/g, " ")
-      .trim();
+  useEffect(() => {
+    fetchDatasets("");
+  }, [fetchDatasets]);
 
-  const compare = (pred?: string, gt?: string) => {
-    const a = normalize(pred);
-    const b = normalize(gt);
-    if (!a || !b) return false;
-    if (a === b) return true;
-    if (a.includes(b)) return true;
-    return false;
-  };
-
-  const handleEvaluate = async () => {
-    if (!agentId || !rows.length || evaluating) return;
+  const handleEvaluate = React.useCallback(async () => {
+    if (!agentId || !selectedDatasetId || evaluating) return;
     try {
       setEvaluating(true);
-      abortCtrlRef.current = new AbortController();
-      const next: EvalRow[] = [];
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const q =
-          (r.data && questionCol ? r.data[questionCol] : undefined) ??
-          r.question ??
-          "";
-        const gt =
-          (r.data && answerCol ? r.data[answerCol] : undefined) ??
-          r.expected ??
-          "";
-        const ts = Date.now();
-        const payload: AgentChatInput = {
-          agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
-          type: 0,
-          meta: { user_id: String(identity?.id ?? "") },
-          message: q,
-        };
-        let text = "";
-        try {
-          const gen = chatAgentStream(payload, {
-            signal: abortCtrlRef.current?.signal,
-          });
-          for await (const chunk of gen as AsyncGenerator<
-            AgentChatStreamChunk,
-            void,
-            unknown
-          >) {
-            text += chunk.delta || chunk.text || "";
-            if (chunk.done) break;
-          }
-        } catch {
-          void 0;
-        }
-        const dur = Date.now() - ts;
-        const correct = compare(text, gt);
-        next.push({
-          id: r.id,
-          question: q,
-          expected: gt,
-          answer: text,
-          timeMs: dur,
-          correct,
-          data: undefined,
-        });
-        setRows((prev) => {
-          const copy = [...prev];
-          const idx = copy.findIndex((x) => x.id === r.id);
-          if (idx !== -1)
-            copy[idx] = {
-              ...copy[idx],
-              answer: text,
-              timeMs: dur,
-              correct,
-            };
-          return copy;
-        });
-      }
-    } finally {
+      setRows([]);
+      await startEvaluation({
+        eva_json_id: selectedDatasetId,
+        agent_id: Number(agentId),
+        type: datasetType,
+      });
+      Message.success(t("evaluation.msg.started", { _: "已开始评测" }));
+    } catch (e: unknown) {
+      Message.error(
+        getErrorMessage(e) ||
+          t("evaluation.msg.startFail", { _: "评测启动失败" }),
+      );
       setEvaluating(false);
-      abortCtrlRef.current = null;
     }
-  };
+  }, [agentId, selectedDatasetId, evaluating, datasetType, t, getErrorMessage]);
 
-  const accuracy = useMemo(() => {
-    const done = rows.filter((r) => typeof r.correct === "boolean");
-    if (!done.length) return 0;
-    const ok = done.filter((r) => r.correct).length;
-    return Math.round((ok / done.length) * 100);
-  }, [rows]);
+  const openHistory = React.useCallback(async () => {
+    if (!agentId) return;
+    try {
+      setHistoryVisible(true);
+      setHistoryLoading(true);
+      const [versionResp, contentResp] = await Promise.all([
+        listAgentVersions({ agent_id: Number(agentId), page: 1, perPage: 100 }),
+        listAgentContents({ agent_id: Number(agentId), page: 1, perPage: 100 }),
+      ]);
+      setVersions(versionResp.data || []);
+      setContents(contentResp.data || []);
+      if ((versionResp.data || []).length > 0) {
+        setSelectedVersionId(Number(versionResp.data[0].id));
+      } else {
+        setSelectedVersionId(undefined);
+      }
+    } catch {
+      Message.error(
+        t("evaluation.msg.loadDataFail", { _: "加载历史数据失败" }),
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [agentId, t]);
 
-  const avgTimeMs = useMemo(() => {
-    const done = rows.filter((r) => typeof r.timeMs === "number");
-    if (!done.length) return 0;
-    const sum = done.reduce((acc, cur) => acc + (cur.timeMs || 0), 0);
-    return Math.round(sum / done.length);
-  }, [rows]);
+  const loadContentsByVersion = React.useCallback(
+    async (versionId?: number) => {
+      if (!agentId) return;
+      setHistoryLoading(true);
+      try {
+        const resp = await listAgentContents({
+          agent_id: Number(agentId),
+          eva_version_id: versionId,
+          page: 1,
+          perPage: 100,
+        });
+        setContents(resp.data || []);
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [agentId],
+  );
 
-  const totalCount = useMemo(() => rows.length, [rows]);
-  const evaluatedCount = useMemo(
-    () => rows.filter((r) => typeof r.timeMs === "number").length,
-    [rows],
-  );
-  const correctCount = useMemo(
-    () => rows.filter((r) => r.correct === true).length,
-    [rows],
-  );
-  const wrongCount = useMemo(
-    () => rows.filter((r) => r.correct === false).length,
-    [rows],
-  );
-  const pendingCount = useMemo(
-    () => Math.max(0, totalCount - evaluatedCount),
-    [totalCount, evaluatedCount],
-  );
-  const donePercent = useMemo(() => {
-    if (!totalCount) return 0;
-    return Math.round((evaluatedCount / totalCount) * 100);
-  }, [totalCount, evaluatedCount]);
+  const progressText = useMemo(() => {
+    const done = rows.length;
+    const total = Number(
+      datasets.find((x) => String(x.id) === selectedDatasetId)?.total_count ||
+        0,
+    );
+    if (!total) return `${done}`;
+    return `${done}/${total}`;
+  }, [rows.length, datasets, selectedDatasetId]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", rowGap: 16 }}>
@@ -388,395 +293,282 @@ const Evaluation: React.FC = () => {
           }}
         >
           <Space>
-            <Input
-              allowClear
-              style={{ width: 280 }}
-              placeholder={t("agent.ui.searchPlaceholder", {
-                _: "按名称/描述搜索",
-              })}
-              value={agentQuery}
-              onChange={setAgentQuery}
-              onPressEnter={runAgentSearch}
-            />
-            <Button
-              type="primary"
-              onClick={runAgentSearch}
-              loading={agentsLoading}
-            >
-              {t("agent.ui.search", { _: "搜索" })}
-            </Button>
-          </Space>
-          <Space>
             <Select
               style={{ width: 320 }}
               value={agentId}
               onChange={setAgentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
               loading={agentsLoading}
-              triggerProps={{
-                popupVisible: selectOpen,
-                onVisibleChange: setSelectOpen,
-              }}
             >
               {agents.map((a) => (
                 <Select.Option key={a.id} value={a.id}>
-                  <Space>
-                    <Avatar size={20} style={{ backgroundColor: "#f6f7fb" }}>
-                      {a.avatar ? (
-                        <img src={a.avatar} alt={a.name} />
-                      ) : (
-                        a.name?.slice(0, 1) || "A"
-                      )}
-                    </Avatar>
-                    <span>{a.name}</span>
-                  </Space>
+                  <span>{a.name}</span>
                 </Select.Option>
               ))}
             </Select>
+            <Button
+              icon={<IconUpload />}
+              onClick={() => navigate("/evaluation/datasets/upload")}
+            >
+              {t("evaluation.ui.uploadFile", { _: "上传测试集" })}
+            </Button>
+            <Button
+              icon={<IconHistory />}
+              onClick={openHistory}
+              disabled={!agentId}
+            >
+              {t("evaluation.ui.history", { _: "历史测评结果" })}
+            </Button>
           </Space>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 12,
-          }}
-        >
-          <Space>
-            {agentId && (
-              <Space>
-                <Avatar size={32} style={{ backgroundColor: "#f6f7fb" }}>
-                  {agents.find((x) => x.id === agentId)?.avatar ? (
-                    <img
-                      src={agents.find((x) => x.id === agentId)?.avatar || ""}
-                      alt={agents.find((x) => x.id === agentId)?.name || ""}
-                    />
-                  ) : (
-                    (agents.find((x) => x.id === agentId)?.name || "A").slice(
-                      0,
-                      1,
-                    )
-                  )}
-                </Avatar>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <Typography.Text style={{ fontWeight: 600 }}>
-                    {agents.find((x) => x.id === agentId)?.name || "-"}
-                  </Typography.Text>
-                  <Typography.Text type="secondary">
-                    {agents.find((x) => x.id === agentId)?.description || ""}
-                  </Typography.Text>
-                </div>
-              </Space>
-            )}
-          </Space>
-          <Space>
-            <Select
-              style={{ width: 200 }}
-              placeholder={t("evaluation.ui.questionCol", { _: "问题列" })}
-              value={questionCol}
-              onChange={setQuestionCol}
-            >
-              {headers.map((h) => (
-                <Select.Option key={h} value={h}>
-                  {h}
-                </Select.Option>
-              ))}
-            </Select>
-            <Select
-              style={{ width: 200 }}
-              placeholder={t("evaluation.ui.answerCol", { _: "答案列" })}
-              value={answerCol}
-              onChange={setAnswerCol}
-            >
-              {headers.map((h) => (
-                <Select.Option key={h} value={h}>
-                  {h}
-                </Select.Option>
-              ))}
-            </Select>
-          </Space>
-        </div>
-        <Upload
-          drag
-          autoUpload={false}
-          fileList={fileList}
-          accept=".xlsx,.csv"
-          onChange={(list: UploadItem[]) => {
-            setFileList(list);
-          }}
-        />
-        <Space style={{ marginTop: 12 }}>
-          <Button
-            type="primary"
-            icon={<IconUpload />}
-            onClick={handleUpload}
-            disabled={!fileList.length}
-            loading={uploading}
+        <Space wrap style={{ marginBottom: 12 }}>
+          <Select
+            style={{ width: 140 }}
+            value={datasetType}
+            onChange={(v) => {
+              setDatasetType(v as "self" | "tenant" | "system");
+              setSelectedDatasetId("");
+            }}
           >
-            {t("rag.ui.startUpload", { _: "上传并解析" })}
+            <Select.Option value="self">个人</Select.Option>
+            <Select.Option value="tenant">租户</Select.Option>
+            <Select.Option value="system">系统</Select.Option>
+          </Select>
+          <Input
+            allowClear
+            style={{ width: 200 }}
+            placeholder={t("evaluation.ui.fileSearch", { _: "搜索测评集" })}
+            value={datasetQuery}
+            onChange={setDatasetQuery}
+            onPressEnter={() => fetchDatasets(datasetQuery.trim())}
+          />
+          <Button
+            onClick={() => fetchDatasets(datasetQuery.trim())}
+            loading={datasetLoading}
+          >
+            {t("agent.ui.search", { _: "搜索" })}
           </Button>
           <Button
             icon={<IconRefresh />}
-            onClick={() => {
-              setFileList([]);
-              setRows([]);
-              setQuestionCol("");
-              setAnswerCol("");
-            }}
-            disabled={!fileList.length}
+            onClick={() => fetchDatasets(datasetQuery.trim())}
+            loading={datasetLoading}
           >
-            {t("rag.ui.clear", { _: "清空" })}
+            {t("rag.ui.refresh", { _: "刷新" })}
           </Button>
           <Button
             type="primary"
             onClick={handleEvaluate}
             loading={evaluating}
-            disabled={!agentId || !questionCol || !rows.length}
+            disabled={!agentId || !selectedDatasetId}
           >
             {t("evaluation.ui.start", { _: "开始评测" })}
           </Button>
         </Space>
+        <Table
+          rowKey="id"
+          loading={datasetLoading}
+          pagination={false}
+          columns={[
+            { title: "ID", dataIndex: "id", width: 120 },
+            { title: "名称", dataIndex: "name" },
+            {
+              title: "范围",
+              dataIndex: "scope",
+              width: 100,
+              render: (v: string) => <Tag>{v || "-"}</Tag>,
+            },
+            {
+              title: "状态",
+              dataIndex: "status",
+              width: 100,
+              render: (v: string) => <Tag>{v || "-"}</Tag>,
+            },
+            { title: "总数", dataIndex: "total_count", width: 100 },
+            { title: "更新时间", dataIndex: "updated_at", width: 180 },
+            {
+              title: "操作",
+              width: 100,
+              render: (_, r) => (
+                <Space>
+                  <Button
+                    type={
+                      String(r.id) === selectedDatasetId ? "outline" : "primary"
+                    }
+                    onClick={() => setSelectedDatasetId(String(r.id))}
+                  >
+                    {String(r.id) === selectedDatasetId
+                      ? t("rag.ui.columns.selected", { _: "已选择" })
+                      : t("rag.ui.columns.select", { _: "选择" })}
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+          data={datasets}
+          onRow={(record) => ({
+            style:
+              String(record.id) === selectedDatasetId
+                ? { background: "var(--color-fill-2)" }
+                : {},
+          })}
+        />
       </Card>
 
-      {rows.length > 0 && (
-        <Card>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 12,
-            }}
-          >
-            <Space>
-              <Tag color="arcoblue">
-                {t("rag.ui.selected.count", { _: "已选择" })}: {rows.length}
-              </Tag>
-            </Space>
-            <Space>
-              <Button
-                type="primary"
-                onClick={handleEvaluate}
-                loading={evaluating}
-                disabled={!agentId || !questionCol || !rows.length}
-              >
-                {t("evaluation.ui.start", { _: "开始评测" })}
-              </Button>
-            </Space>
+      <Card>
+        <div
+          style={{
+            marginBottom: 12,
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography.Text>
+            {t("evaluation.ui.progress", { _: "评测进度" })}: {progressText}
+          </Typography.Text>
+          {evaluating && <Spin size={16} />}
+        </div>
+        <Table
+          loading={false}
+          pagination={false}
+          rowKey="id"
+          columns={[
+            { title: "ID", dataIndex: "id", width: 80 },
+            {
+              title: "instruction",
+              dataIndex: "instruction",
+              width: 220,
+              render: (v: string) => v || "-",
+            },
+            {
+              title: "input",
+              dataIndex: "input",
+              width: 280,
+              render: (v: string) => v || "-",
+            },
+            {
+              title: "output",
+              dataIndex: "output",
+              width: 220,
+              render: (v: string) => v || "-",
+            },
+            {
+              title: "fact_output",
+              dataIndex: "fact_output",
+              render: (v: string) => v || "-",
+            },
+            {
+              title: "score",
+              dataIndex: "score",
+              width: 100,
+              render: (v: number) => (
+                <Tag>{typeof v === "number" ? v : "-"}</Tag>
+              ),
+            },
+            {
+              title: "opinion",
+              dataIndex: "opinion",
+              width: 300,
+              render: (v: string) => v || "-",
+            },
+          ]}
+          data={rows}
+        />
+      </Card>
+
+      <Modal
+        title={t("evaluation.ui.history", { _: "历史测评结果" })}
+        visible={historyVisible}
+        onCancel={() => setHistoryVisible(false)}
+        footer={null}
+        style={{ width: 1000 }}
+      >
+        <Space style={{ width: "100%", alignItems: "start" }}>
+          <div style={{ width: 360 }}>
+            <Typography.Text style={{ fontWeight: 600 }}>
+              版本列表
+            </Typography.Text>
+            <Table
+              rowKey="id"
+              loading={historyLoading}
+              pagination={false}
+              style={{ marginTop: 8 }}
+              columns={[
+                { title: "版本ID", dataIndex: "id", width: 90 },
+                { title: "创建时间", dataIndex: "created_at" },
+              ]}
+              data={versions}
+              onRow={(record) => ({
+                onClick: () => {
+                  const id = Number(record.id || 0);
+                  setSelectedVersionId(id);
+                  loadContentsByVersion(id);
+                },
+                style:
+                  Number(record.id || 0) === Number(selectedVersionId || 0)
+                    ? { background: "var(--color-fill-2)" }
+                    : {},
+              })}
+            />
           </div>
-          <Grid.Row gutter={16} style={{ marginBottom: 12 }}>
-            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
-              <Card bordered hoverable>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <Progress
-                    type="circle"
-                    percent={accuracy}
-                    style={{ marginRight: 12 }}
-                  />
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <Typography.Text style={{ fontWeight: 600 }}>
-                      {t("evaluation.ui.accuracy", { _: "准确率" })}
-                    </Typography.Text>
-                    <Typography.Text type="secondary">
-                      {t("evaluation.ui.avgTime", { _: "平均用时" })}:{" "}
-                      {avgTimeMs}ms
-                    </Typography.Text>
-                  </div>
-                </div>
-              </Card>
-            </Grid.Col>
-            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
-              <Card bordered hoverable>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                  <Statistic
-                    title={t("evaluation.ui.columns.correct", {
-                      _: "是否正确",
-                    })}
-                    value={`${correctCount}/${evaluatedCount}`}
-                  />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Tag color="green">
-                      {t("common.yes", { _: "是" })}: {correctCount}
-                    </Tag>
-                    <Tag color="red">
-                      {t("common.no", { _: "否" })}: {wrongCount}
-                    </Tag>
-                  </div>
-                </div>
-              </Card>
-            </Grid.Col>
-            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
-              <Card bordered hoverable>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                  <Statistic
-                    title={t("evaluation.ui.total", { _: "总题数" })}
-                    value={totalCount}
-                  />
-                  <Tooltip content={`${donePercent}%`}>
-                    <Progress percent={donePercent} status="normal" />
-                  </Tooltip>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Tag color="arcoblue">
-                      {t("evaluation.ui.done", { _: "已评测" })}:{" "}
-                      {evaluatedCount}
-                    </Tag>
-                    <Tag>
-                      {t("evaluation.ui.pending", { _: "未评测" })}:{" "}
-                      {pendingCount}
-                    </Tag>
-                  </div>
-                </div>
-              </Card>
-            </Grid.Col>
-            <Grid.Col xs={24} sm={12} md={6} lg={6} xl={6}>
-              <Card bordered hoverable>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Avatar size={40} style={{ backgroundColor: "#f6f7fb" }}>
-                    {agents.find((x) => x.id === agentId)?.avatar ? (
-                      <img
-                        src={agents.find((x) => x.id === agentId)?.avatar || ""}
-                        alt={agents.find((x) => x.id === agentId)?.name || ""}
-                      />
-                    ) : (
-                      (agents.find((x) => x.id === agentId)?.name || "A").slice(
-                        0,
-                        1,
-                      )
-                    )}
-                  </Avatar>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <Typography.Text style={{ fontWeight: 600 }}>
-                      {agents.find((x) => x.id === agentId)?.name || "-"}
-                    </Typography.Text>
-                    <Typography.Text type="secondary">
-                      {agents.find((x) => x.id === agentId)?.description || ""}
-                    </Typography.Text>
-                  </div>
-                </div>
-              </Card>
-            </Grid.Col>
-          </Grid.Row>
-          <Divider />
-          <Table
-            loading={evaluating && !rows.length}
-            pagination={false}
-            rowKey="id"
-            expandedRowRender={(record) => (
-              <div style={{ display: "flex", gap: 12 }}>
-                <Card style={{ flex: 1 }} bordered>
-                  <Typography.Text style={{ fontWeight: 600 }}>
-                    {t("evaluation.ui.columns.expected", { _: "期望答案" })}
-                  </Typography.Text>
-                  <Typography.Paragraph style={{ marginBottom: 0 }}>
-                    {record.expected || "-"}
-                  </Typography.Paragraph>
-                </Card>
-                <Card style={{ flex: 1 }} bordered>
-                  <Typography.Text style={{ fontWeight: 600 }}>
-                    {t("evaluation.ui.columns.answer", { _: "生成答案" })}
-                  </Typography.Text>
-                  <Typography.Paragraph style={{ marginBottom: 0 }}>
-                    {record.answer || "-"}
-                  </Typography.Paragraph>
-                </Card>
-              </div>
-            )}
-            columns={[
-              { title: "ID", dataIndex: "id", width: 80 },
-              {
-                title: t("evaluation.ui.columns.question", { _: "问题" }),
-                dataIndex: "question",
-                width: 280,
-                render: (v: string) => (
-                  <Tooltip content={v || "-"}>
-                    <Typography.Paragraph
-                      style={{ marginBottom: 0 }}
-                      ellipsis={{ rows: 2 }}
+          <div style={{ flex: 1 }}>
+            <Typography.Text style={{ fontWeight: 600 }}>
+              测评结果
+            </Typography.Text>
+            <Table
+              rowKey="id"
+              loading={historyLoading}
+              pagination={false}
+              style={{ marginTop: 8 }}
+              columns={[
+                { title: "结果ID", dataIndex: "id", width: 90 },
+                {
+                  title: "状态",
+                  dataIndex: "status",
+                  width: 100,
+                  render: (v: string) => <Tag>{v || "-"}</Tag>,
+                },
+                {
+                  title: "进度",
+                  render: (_, r) =>
+                    `${r.completed_count || 0}/${r.total_count || 0}`,
+                },
+                { title: "完成时间", dataIndex: "finished_at", width: 180 },
+                {
+                  title: "操作",
+                  width: 100,
+                  render: (_, r) => (
+                    <Button
+                      size="mini"
+                      onClick={async () => {
+                        const detail = await getEvaluationContent(Number(r.id));
+                        setContentPreview(String(detail.content_json || "[]"));
+                        setContentPreviewVisible(true);
+                      }}
                     >
-                      {v || "-"}
-                    </Typography.Paragraph>
-                  </Tooltip>
-                ),
-              },
-              {
-                title: t("evaluation.ui.columns.expected", { _: "期望答案" }),
-                dataIndex: "expected",
-                width: 280,
-                render: (v: string) => (
-                  <Tooltip content={v || "-"}>
-                    <Typography.Paragraph
-                      style={{ marginBottom: 0 }}
-                      ellipsis={{ rows: 2 }}
-                    >
-                      {v || "-"}
-                    </Typography.Paragraph>
-                  </Tooltip>
-                ),
-              },
-              {
-                title: t("evaluation.ui.columns.answer", { _: "生成答案" }),
-                dataIndex: "answer",
-                render: (v: string) => (
-                  <Tooltip content={v || "-"}>
-                    <Typography.Paragraph
-                      style={{ marginBottom: 0 }}
-                      ellipsis={{ rows: 2 }}
-                    >
-                      {v || "-"}
-                    </Typography.Paragraph>
-                  </Tooltip>
-                ),
-              },
-              {
-                title: t("evaluation.ui.columns.time", { _: "用时(ms)" }),
-                dataIndex: "timeMs",
-                width: 140,
-                render: (v: unknown) =>
-                  typeof v === "number" ? `${v}ms` : "-",
-              },
-              {
-                title: t("evaluation.ui.columns.correct", { _: "是否正确" }),
-                dataIndex: "correct",
-                width: 140,
-                render: (v: unknown) =>
-                  typeof v === "boolean" ? (
-                    <Space>
-                      {v ? (
-                        <IconCheckCircle style={{ color: "#04C877" }} />
-                      ) : (
-                        <IconCloseCircle style={{ color: "#F53F3F" }} />
-                      )}
-                      <Tag color={v ? "green" : "red"}>
-                        {v
-                          ? t("common.yes", { _: "是" })
-                          : t("common.no", { _: "否" })}
-                      </Tag>
-                    </Space>
-                  ) : (
-                    <Tag>...</Tag>
+                      查看
+                    </Button>
                   ),
-              },
-            ]}
-            data={rows}
-          />
-          {evaluating && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginTop: 12,
-              }}
-            >
-              <Spin />
-            </div>
-          )}
-        </Card>
-      )}
+                },
+              ]}
+              data={contents}
+            />
+          </div>
+        </Space>
+      </Modal>
+
+      <Modal
+        title="测评结果详情"
+        visible={contentPreviewVisible}
+        onCancel={() => setContentPreviewVisible(false)}
+        footer={null}
+        style={{ width: 860 }}
+      >
+        <Typography.Paragraph
+          style={{ whiteSpace: "pre-wrap", maxHeight: 500, overflow: "auto" }}
+        >
+          {contentPreview}
+        </Typography.Paragraph>
+      </Modal>
     </div>
   );
 };

@@ -35,12 +35,12 @@ import {
   listDocuments,
   updateDocument,
   deleteDocument,
-} from "../../data/api/rag";
-import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
-import { useDarkMode } from "../../data/hook/useDark";
+} from "../../../data/api/rag";
+import type { ListRagDocsNameSpace } from "../../../data/api/rag/type";
+import { useDarkMode } from "../../../data/hook/useDark";
 import { getStrategyOption } from "./strategyOptions";
-import { uploadFileForRag, cancelUpload } from "../../utils/upload/uploader";
-import type { UploadStatus, UploadTaskState } from "../../utils/upload/types";
+import { uploadFileForRag, cancelUpload } from "../../../utils/upload/uploader";
+import { UploadStatus, UploadTaskState } from "../../../utils/upload/types";
 
 const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
@@ -160,7 +160,7 @@ const RagPage: React.FC = () => {
   }, [t, uploadStatus]);
 
   const openUploadPage = () => {
-    navigate("/rag/upload");
+    navigate("/rag/upload", { state: { back_to: "/rag?tab=knowledge" } });
   };
 
   const handleCancelUpload = async () => {

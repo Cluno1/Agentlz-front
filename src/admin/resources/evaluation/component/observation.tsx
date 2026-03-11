@@ -26,7 +26,7 @@ import {
 } from "../../../data/api/agent";
 import { listModels, getModel } from "../../../data/api/model";
 import type { ListModelsNameSpace } from "../../../data/api/model/type";
-import { getStrategyOption } from "../../rag/strategyOptions";
+import { getStrategyOption } from "../../rag/rag/strategyOptions";
 
 type Props = {
   active: "base" | "rag" | "mcp" | "model";

@@ -11,6 +11,7 @@ export namespace UploadsNameSpace {
     tags?: string[];
     strategy?: string[];
     document_type?: string;
+    is_evaluation?: boolean;
     [k: string]: unknown;
   };
 

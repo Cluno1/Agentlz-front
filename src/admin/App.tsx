@@ -29,17 +29,18 @@ import Chat from "./resources/chat";
 import Agent from "./resources/agent";
 import CreateAgent from "./resources/agent/CreateAgent";
 import McpToolsPage from "./resources/mcp/McpToolsPage";
-import RagPage from "./resources/rag/RagPage";
+import RagIndexPage from "./resources/rag";
 import CreatePage from "./resources/create/CreatePage";
-import RagUploadPage from "./resources/rag/RagUploadPage";
-import RagShow from "./resources/rag/RagShow";
-import ChunkPage from "./resources/rag/ChunkPage";
-import ChunkShow from "./resources/rag/ChunkShow";
-import RagStrategyPage from "./resources/rag/RagStrategyPage";
-import RagStrategyAllPage from "./resources/rag/RagStrategyAllPage";
+import RagUploadPage from "./resources/rag/rag/RagUploadPage";
+import RagShow from "./resources/rag/rag/RagShow";
+import ChunkPage from "./resources/rag/rag/ChunkPage";
+import ChunkShow from "./resources/rag/rag/ChunkShow";
+import RagStrategyPage from "./resources/rag/rag/RagStrategyPage";
+import RagStrategyAllPage from "./resources/rag/rag/RagStrategyAllPage";
 import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
 import Evaluation from "./resources/evaluation";
+import EvaluationDatasetUploadPage from "./resources/evaluation/component/EvaluationDatasetUploadPage";
 import { wsClient } from "./data/wsClient";
 
 const BASENAME = (() => {
@@ -179,7 +180,7 @@ export const App = () => {
         name="rag"
         list={
           <ArcoLocaleBridge>
-            <RagPage />
+            <RagIndexPage />
           </ArcoLocaleBridge>
         }
         show={
@@ -200,10 +201,34 @@ export const App = () => {
       <CustomRoutes>
         <Route path="/register" element={<RegisterPage />} />
         <Route
+          path="/rag/knowledge"
+          element={
+            <ArcoLocaleBridge>
+              <RagIndexPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/evaluation"
+          element={
+            <ArcoLocaleBridge>
+              <RagIndexPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
           path="/rag/upload"
           element={
             <ArcoLocaleBridge>
               <RagUploadPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/evaluation/datasets/upload"
+          element={
+            <ArcoLocaleBridge>
+              <EvaluationDatasetUploadPage />
             </ArcoLocaleBridge>
           }
         />

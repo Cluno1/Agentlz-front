@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Title, useTranslate } from "react-admin";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, Button, Space, Tag } from "@arco-design/web-react";
-import { useDarkMode } from "../../data/hook/useDark";
+import { useDarkMode } from "../../../data/hook/useDark";
 import { getStrategyOption } from "./strategyOptions";
 
 const RagStrategyPage: React.FC = () => {

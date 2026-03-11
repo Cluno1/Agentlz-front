@@ -25,7 +25,7 @@ import { listMcps } from "../../data/api/mcp";
 import type { ListMcpNameSpace } from "../../data/api/mcp/type";
 import { listModels } from "../../data/api/model";
 import type { ListModelsNameSpace } from "../../data/api/model/type";
-import { getStrategyOption } from "../rag/strategyOptions";
+import { getStrategyOption } from "../rag/rag/strategyOptions";
 
 const CreateAgent: React.FC = () => {
   const t = useTranslate();

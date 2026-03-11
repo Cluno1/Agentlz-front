@@ -13,19 +13,25 @@ import {
 } from "@arco-design/web-react";
 import { IconUpload, IconRefresh } from "@arco-design/web-react/icon";
 import type { UploadItem } from "@arco-design/web-react/es/Upload/interface";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { strategyOptions } from "./strategyOptions";
 
 const RagUploadPage: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
+  const location = useLocation();
   const [fileList, setFileList] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [tags, setTags] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [docType, setDocType] = useState<string>("self");
+  const [docType, setDocType] = useState<string>(() => {
+    const s = (location.state as any)?.scope;
+    if (s === "self" || s === "tenant" || s === "system") return s;
+    return "self";
+  });
   const [fileName, setFileName] = useState<string>("");
   const [strategies, setStrategies] = useState<string[]>(["-1"]);
+  const backTo = "/rag?tab=knowledge";
 
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
@@ -58,7 +64,7 @@ const RagUploadPage: React.FC = () => {
       return;
     }
     const tagArray = tags.split(/[,\s]+/).filter(Boolean);
-    navigate("/rag", {
+    navigate(backTo, {
       state: {
         uploadFrom: "ragUpload",
         file,
@@ -79,6 +85,11 @@ const RagUploadPage: React.FC = () => {
       title={<Title title={t("rag.ui.tabs.upload", { _: "上传文档" })} />}
       bordered
     >
+      <Space style={{ marginBottom: 12 }}>
+        <Tag color="arcoblue">
+          {t("rag.ui.knowledgeDocs", { _: "知识文档" })}
+        </Tag>
+      </Space>
       <Upload
         drag
         autoUpload={false}

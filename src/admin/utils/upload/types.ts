@@ -65,6 +65,7 @@ export type UploadTaskState = {
   description?: string;
   tags?: string[];
   strategy?: string[];
+  isEvaluation?: boolean;
   uploadedParts: number[];
   partRecords: PartRecord[];
   nextOffset: number;

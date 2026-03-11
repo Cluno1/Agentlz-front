@@ -12,12 +12,12 @@ import {
   Checkbox,
 } from "@arco-design/web-react";
 import { IconEye } from "@arco-design/web-react/icon";
-import { useDarkMode } from "../../data/hook/useDark";
+import { useDarkMode } from "../../../data/hook/useDark";
 import {
   listDocumentStrategies,
   publishDocumentChunk,
-} from "../../data/api/rag";
-import type { ListDocStrategiesNameSpace } from "../../data/api/rag/type";
+} from "../../../data/api/rag";
+import type { ListDocStrategiesNameSpace } from "../../../data/api/rag/type";
 
 const STRATEGY_MAP: Record<string, { name: string; description: string }> = {
   "0": { name: "基础中文切割", description: "basic_chinese_text_split" },

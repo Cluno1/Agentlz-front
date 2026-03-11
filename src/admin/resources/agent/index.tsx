@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate } from "react-admin";
+import {
+  Title,
+  useTranslate,
+  useCreatePath,
+  usePermissions,
+} from "react-admin";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -42,13 +47,15 @@ const DISABLED_OPTIONS: Array<"all" | "enabled" | "disabled"> = [
 const AgentListPage: React.FC = () => {
   const t = useTranslate();
   const navigate = useNavigate();
+  const createPath = useCreatePath();
   const { cardColorStyle } = useDarkMode();
+  const { permissions } = usePermissions();
   const [agents, setAgents] = useState<ListAgentsNameSpace.ListAgentsResult[]>(
     [],
   );
   const [query, setQuery] = useState<string>("");
   const [status, setStatus] = useState<"all" | "enabled" | "disabled">("all");
-  const [scope, setScope] = useState<"self" | "tenant">("self");
+  const [scope, setScope] = useState<"self" | "tenant" | "system">("self");
   const [loading, setLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -68,14 +75,21 @@ const AgentListPage: React.FC = () => {
   const [apiRecord, setApiRecord] =
     useState<ListAgentsNameSpace.ListAgentsResult | null>(null);
 
-  const isDefaultTenant =
-    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
-    "default";
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isDefaultTenant = tenantId === "default";
+  const isSuperAdmin =
+    permissions === "admin" &&
+    (tenantId === "system" || tenantId === "default");
 
   useEffect(() => {
     fetchAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, page, pageSize, sortField, sortOrder]);
+
+  useEffect(() => {
+    if (isSuperAdmin && scope === "tenant") setScope("self");
+  }, [isSuperAdmin, scope]);
 
   const fetchAgents = async () => {
     setLoading(true);
@@ -197,6 +211,18 @@ const AgentListPage: React.FC = () => {
     }
   };
 
+  const openMcpDetail = (id?: number) => {
+    if (!id && id !== 0) return;
+    const to = createPath({ resource: "mcp", type: "show", id });
+    navigate(to);
+  };
+
+  const openRagDetail = (id?: string) => {
+    if (!id) return;
+    const to = createPath({ resource: "rag", type: "show", id });
+    navigate(to);
+  };
+
   const columns = [
     {
       title: t("agent.ui.columns.name", { _: "名称" }),
@@ -241,18 +267,64 @@ const AgentListPage: React.FC = () => {
       ),
     },
     {
-      title: t("agent.ui.columns.mcpIds", { _: "MCP ID" }),
-      dataIndex: "mcp_agent_ids",
-      width: 160,
-      render: (v: number[] | undefined) => (
-        <Space wrap>
-          {(v || []).map((id, idx) => (
-            <Tag key={`${id}-${idx}`} size="small">
-              {id}
-            </Tag>
-          ))}
-        </Space>
-      ),
+      title: t("agent.ui.columns.mcpIds", { _: "MCP 工具" }),
+      dataIndex: "mcp_agents",
+      width: 180,
+      render: (
+        mcpAgents: Array<{ id: number; name: string }> | undefined,
+        rec: ListAgentsNameSpace.ListAgentsResult,
+      ) => {
+        const list = mcpAgents || [];
+        if (list.length > 0) {
+          return (
+            <Popover
+              trigger="hover"
+              position="top"
+              content={
+                <div style={{ maxWidth: 320 }}>
+                  {list.map((m, idx) => (
+                    <div
+                      key={`${m.id}-${idx}`}
+                      style={{ marginBottom: 4, cursor: "pointer" }}
+                      onClick={() => openMcpDetail(m.id)}
+                    >
+                      <Tag size="small" style={{ marginRight: 8 }}>
+                        <span>{m.name}</span>
+                      </Tag>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <span style={{ cursor: "pointer" }}>{list.length}</span>
+            </Popover>
+          );
+        }
+        const ids = rec.mcp_agent_ids || [];
+        if (ids.length === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 320 }}>
+                {ids.map((id, idx) => (
+                  <Tag
+                    key={`${id}-${idx}`}
+                    size="small"
+                    style={{ margin: 4, cursor: "pointer" }}
+                    onClick={() => openMcpDetail(id)}
+                  >
+                    {id}
+                  </Tag>
+                ))}
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{ids.length}</span>
+          </Popover>
+        );
+      },
     },
     {
       title: t("agent.ui.columns.docCount", { _: "文档数量" }),
@@ -269,7 +341,11 @@ const AgentListPage: React.FC = () => {
             content={
               <div style={{ maxWidth: 320 }}>
                 {list.map((d, idx) => (
-                  <div key={`${d.id}-${idx}`} style={{ marginBottom: 4 }}>
+                  <div
+                    key={`${d.id}-${idx}`}
+                    style={{ marginBottom: 4, cursor: "pointer" }}
+                    onClick={() => openRagDetail(d.id)}
+                  >
                     <span>{d.name}</span>
                   </div>
                 ))}
@@ -341,7 +417,7 @@ const AgentListPage: React.FC = () => {
             >
               {t("agent.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => setScope("tenant")}
@@ -349,6 +425,12 @@ const AgentListPage: React.FC = () => {
                 {t("agent.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
+            <Button
+              type={scope === "system" ? "primary" : "outline"}
+              onClick={() => setScope("system")}
+            >
+              {t("agent.ui.tabs.system", { _: "系统" })}
+            </Button>
           </Button.Group>
         </Space>
         <Button type="primary" onClick={() => navigate("/agent/create")}>

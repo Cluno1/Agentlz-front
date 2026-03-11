@@ -15,6 +15,7 @@ import { UserManagement } from "./resources/management/userManagement";
 import UserCreate from "./resources/management/userManagement/UserCreate";
 import UserEdit from "./resources/management/userManagement/UserEdit";
 import { SystemManagement } from "./resources/management/SystemManagement";
+import TenantManagement from "./resources/management/TenantManagement";
 import ProfilePage from "./resources/profile";
 import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
@@ -27,11 +28,20 @@ import enUS from "@arco-design/web-react/es/locale/en-US";
 import Chat from "./resources/chat";
 import Agent from "./resources/agent";
 import CreateAgent from "./resources/agent/CreateAgent";
-import McpToolsPage from "./resources/tools/McpToolsPage";
-import RagPage from "./resources/rag/RagPage";
+import McpToolsPage from "./resources/mcp/McpToolsPage";
+import RagIndexPage from "./resources/rag";
 import CreatePage from "./resources/create/CreatePage";
-import RagUploadPage from "./resources/rag/RagUploadPage";
-import RagShow from "./resources/rag/RagShow";
+import RagUploadPage from "./resources/rag/rag/RagUploadPage";
+import RagShow from "./resources/rag/rag/RagShow";
+import ChunkPage from "./resources/rag/rag/ChunkPage";
+import ChunkShow from "./resources/rag/rag/ChunkShow";
+import RagStrategyPage from "./resources/rag/rag/RagStrategyPage";
+import RagStrategyAllPage from "./resources/rag/rag/RagStrategyAllPage";
+import McpCreatePage from "./resources/mcp/McpCreatePage";
+import McpShow from "./resources/mcp/McpShow";
+import Evaluation from "./resources/evaluation";
+import EvaluationDatasetUploadPage from "./resources/evaluation/component/EvaluationDatasetUploadPage";
+import { wsClient } from "./data/wsClient";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -70,111 +80,207 @@ const darkTheme = {
   palette: { mode: "dark" },
 };
 
-export const App = () => (
-  <Admin
-    layout={Layout}
-    basename={BASENAME}
-    authProvider={authProvider}
-    dataProvider={dataProvider}
-    i18nProvider={i18nProvider}
-    loginPage={LoginPage}
-    dashboard={DashboardPage}
-    darkTheme={darkTheme}
-  >
-    <Resource
-      name="user-management"
-      list={
-        <ArcoLocaleBridge>
-          <UserManagement />
-        </ArcoLocaleBridge>
-      }
-      create={<UserCreate />}
-      edit={<UserEdit />}
-    />
-    <Resource
-      name="system-management"
-      list={
-        <ArcoLocaleBridge>
-          <SystemManagement />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="profile"
-      list={
-        <ArcoLocaleBridge>
-          <ProfilePage />
-        </ArcoLocaleBridge>
-      }
-      edit={<ProfileEdit />}
-    />
-    <Resource
-      name="create"
-      list={
-        <ArcoLocaleBridge>
-          <CreatePage />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="chat"
-      list={
-        <ArcoLocaleBridge>
-          <Chat />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="agent"
-      list={
-        <ArcoLocaleBridge>
-          <Agent />
-        </ArcoLocaleBridge>
-      }
-    />
+export const App = () => {
+  useEffect(() => {
+    wsClient.connect();
+    return () => {
+      wsClient.disconnect();
+    };
+  }, []);
 
-    <Resource
-      name="mcp-tools"
-      list={
-        <ArcoLocaleBridge>
-          <McpToolsPage />
-        </ArcoLocaleBridge>
-      }
-    />
-    <Resource
-      name="rag"
-      list={
-        <ArcoLocaleBridge>
-          <RagPage />
-        </ArcoLocaleBridge>
-      }
-      show={
-        <ArcoLocaleBridge>
-          <RagShow />
-        </ArcoLocaleBridge>
-      }
-    />
-
-    {/* 公开路由：注册页（不需要认证） */}
-
-    <CustomRoutes>
-      <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/rag/upload"
-        element={
+  return (
+    <Admin
+      layout={Layout}
+      basename={BASENAME}
+      authProvider={authProvider}
+      dataProvider={dataProvider}
+      i18nProvider={i18nProvider}
+      loginPage={LoginPage}
+      dashboard={DashboardPage}
+      darkTheme={darkTheme}
+    >
+      <Resource
+        name="user-management"
+        list={
           <ArcoLocaleBridge>
-            <RagUploadPage />
+            <UserManagement />
+          </ArcoLocaleBridge>
+        }
+        create={<UserCreate />}
+        edit={<UserEdit />}
+      />
+      <Resource
+        name="system-management"
+        list={
+          <ArcoLocaleBridge>
+            <SystemManagement />
           </ArcoLocaleBridge>
         }
       />
-      <Route
-        path="/agent/create"
-        element={
+      <Resource
+        name="tenant-management"
+        list={
           <ArcoLocaleBridge>
-            <CreateAgent />
+            <TenantManagement />
           </ArcoLocaleBridge>
         }
       />
-    </CustomRoutes>
-  </Admin>
-);
+      <Resource
+        name="profile"
+        list={
+          <ArcoLocaleBridge>
+            <ProfilePage />
+          </ArcoLocaleBridge>
+        }
+        edit={<ProfileEdit />}
+      />
+      <Resource
+        name="create"
+        list={
+          <ArcoLocaleBridge>
+            <CreatePage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="chat"
+        list={
+          <ArcoLocaleBridge>
+            <Chat />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="agent"
+        list={
+          <ArcoLocaleBridge>
+            <Agent />
+          </ArcoLocaleBridge>
+        }
+      />
+
+      <Resource
+        name="evaluation"
+        list={
+          <ArcoLocaleBridge>
+            <Evaluation />
+          </ArcoLocaleBridge>
+        }
+      />
+
+      <Resource
+        name="mcp-tools"
+        list={
+          <ArcoLocaleBridge>
+            <McpToolsPage />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="rag"
+        list={
+          <ArcoLocaleBridge>
+            <RagIndexPage />
+          </ArcoLocaleBridge>
+        }
+        show={
+          <ArcoLocaleBridge>
+            <RagShow />
+          </ArcoLocaleBridge>
+        }
+      />
+      <Resource
+        name="mcp"
+        show={
+          <ArcoLocaleBridge>
+            <McpShow />
+          </ArcoLocaleBridge>
+        }
+      />
+
+      <CustomRoutes>
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/rag/knowledge"
+          element={
+            <ArcoLocaleBridge>
+              <RagIndexPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/evaluation"
+          element={
+            <ArcoLocaleBridge>
+              <RagIndexPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/upload"
+          element={
+            <ArcoLocaleBridge>
+              <RagUploadPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/evaluation/datasets/upload"
+          element={
+            <ArcoLocaleBridge>
+              <EvaluationDatasetUploadPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/agent/create"
+          element={
+            <ArcoLocaleBridge>
+              <CreateAgent />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/mcp/create"
+          element={
+            <ArcoLocaleBridge>
+              <McpCreatePage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/:id/chunks"
+          element={
+            <ArcoLocaleBridge>
+              <ChunkPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/:id/chunks/:strategy"
+          element={
+            <ArcoLocaleBridge>
+              <ChunkShow />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/strategy/all"
+          element={
+            <ArcoLocaleBridge>
+              <RagStrategyAllPage />
+            </ArcoLocaleBridge>
+          }
+        />
+        <Route
+          path="/rag/strategy/:strategyId"
+          element={
+            <ArcoLocaleBridge>
+              <RagStrategyPage />
+            </ArcoLocaleBridge>
+          }
+        />
+      </CustomRoutes>
+    </Admin>
+  );
+};

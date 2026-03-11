@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate, useCreatePath } from "react-admin";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import {
+  Title,
+  useTranslate,
+  useCreatePath,
+  usePermissions,
+} from "react-admin";
 import {
   Card,
   Button,
@@ -15,6 +20,7 @@ import {
   Form,
   Popover,
   Switch,
+  Progress,
 } from "@arco-design/web-react";
 import {
   IconUpload,
@@ -24,20 +30,25 @@ import {
   IconDelete,
   IconEye,
 } from "@arco-design/web-react/icon";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   listDocuments,
   updateDocument,
   deleteDocument,
-} from "../../data/api/rag";
-import type { ListRagDocsNameSpace } from "../../data/api/rag/type";
-import { useDarkMode } from "../../data/hook/useDark";
+} from "../../../data/api/rag";
+import type { ListRagDocsNameSpace } from "../../../data/api/rag/type";
+import { useDarkMode } from "../../../data/hook/useDark";
+import { getStrategyOption } from "./strategyOptions";
+import { uploadFileForRag, cancelUpload } from "../../../utils/upload/uploader";
+import { UploadStatus, UploadTaskState } from "../../../utils/upload/types";
 
 const STATUS_OPTIONS: Array<string | "all"> = ["all", "processing", "ready"];
 
 const RagPage: React.FC = () => {
   const t = useTranslate();
+  const { permissions } = usePermissions();
   const navigate = useNavigate();
+  const location = useLocation();
   const createPath = useCreatePath();
   const { cardColorStyle } = useDarkMode();
   const [docs, setDocs] = useState<ListRagDocsNameSpace.ListRagDocsResult[]>(
@@ -62,10 +73,24 @@ const RagPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [sortField, setSortField] = useState<string>("id");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadState, setUploadState] = useState<UploadTaskState | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const uploadStartedRef = useRef(false);
 
-  const isDefaultTenant =
-    (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
-    "default";
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isDefaultTenant = tenantId === "default";
+  const isSuperAdmin = useMemo(() => {
+    const role =
+      typeof permissions === "string"
+        ? permissions
+        : (permissions as any)?.role;
+    return (
+      role === "admin" && (tenantId === "system" || tenantId === "default")
+    );
+  }, [permissions, tenantId]);
 
   useEffect(() => {
     fetchDocs();
@@ -73,12 +98,84 @@ const RagPage: React.FC = () => {
   }, [status, scope, page, pageSize, sortField, sortOrder]);
 
   useEffect(() => {
-    if (isDefaultTenant && scope === "tenant") setScope("self");
+    if ((isDefaultTenant || isSuperAdmin) && scope === "tenant")
+      setScope("self");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (uploadStartedRef.current) return;
+    const state = location.state as any;
+    if (state && state.uploadFrom === "ragUpload" && state.file) {
+      uploadStartedRef.current = true;
+      navigate(location.pathname, { replace: true });
+      const params = state.uploadParams || {};
+      (async () => {
+        try {
+          setUploading(true);
+          await uploadFileForRag(state.file as File, params, {
+            onStatus: (next) => {
+              setUploadStatus(next);
+              if (next === "uploading") {
+                setUploadProgress(0);
+              }
+            },
+            onProgress: (p) => {
+              setUploadProgress(p.percent);
+            },
+            onTaskReady: (taskState) => {
+              setUploadState(taskState);
+            },
+          });
+          Message.success(
+            t("rag.msg.uploadSuccess", { _: "上传成功，等待扫描与解析" }),
+          );
+        } catch (e: any) {
+          Message.error(
+            e?.message || t("rag.msg.uploadError", { _: "上传失败" }),
+          );
+        } finally {
+          setUploading(false);
+          setUploadStatus("idle");
+          setUploadProgress(0);
+          setUploadState(null);
+          uploadStartedRef.current = false;
+        }
+      })();
+    }
+  }, [location, navigate, t]);
+
+  const uploadStatusText = useMemo(() => {
+    if (uploadStatus === "hashing")
+      return t("rag.msg.hashing", { _: "计算文件指纹" });
+    if (uploadStatus === "uploading")
+      return t("rag.msg.uploading", { _: "上传中" });
+    if (uploadStatus === "waiting_scan")
+      return t("rag.msg.waitScan", { _: "等待安全扫描" });
+    if (uploadStatus === "processing")
+      return t("rag.msg.processing", { _: "解析中" });
+    if (uploadStatus === "completed") return t("rag.msg.done", { _: "完成" });
+    if (uploadStatus === "failed") return t("rag.msg.failed", { _: "失败" });
+    return "";
+  }, [t, uploadStatus]);
+
   const openUploadPage = () => {
-    navigate("/rag/upload");
+    navigate("/rag/upload", { state: { back_to: "/rag?tab=knowledge" } });
+  };
+
+  const handleCancelUpload = async () => {
+    if (!uploadState) return;
+    try {
+      await cancelUpload(uploadState);
+      setUploadStatus("failed");
+      Message.info(t("rag.msg.cancelled", { _: "已取消上传" }));
+    } catch (e: any) {
+      Message.error(
+        e?.message || t("rag.msg.cancelError", { _: "取消上传失败" }),
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   const fetchDocs = async () => {
@@ -195,6 +292,10 @@ const RagPage: React.FC = () => {
     }
   };
 
+  const openStrategyDetail = (strategyId: string | number) => {
+    navigate(`/rag/strategy/${encodeURIComponent(String(strategyId))}`);
+  };
+
   const columns = [
     {
       title: t("rag.ui.columns.name", { _: "名称" }),
@@ -217,6 +318,57 @@ const RagPage: React.FC = () => {
         <Tag color={s === "ready" ? "green" : "orangered"}>{s}</Tag>
       ),
       width: 100,
+    },
+    {
+      title: t("rag.ui.columns.strategyCount", { _: "策略种类" }),
+      dataIndex: "strategy",
+      width: 120,
+      render: (
+        v: Array<string | number> | undefined,
+        record: ListRagDocsNameSpace.ListRagDocsResult,
+      ) => {
+        const ids = Array.isArray(record.strategy) ? record.strategy : v;
+        const arr = Array.isArray(ids) ? ids : [];
+        const normalized = Array.from(
+          new Set(arr.map((x) => String(x)).filter(Boolean)),
+        );
+        const count = normalized.length;
+        if (count === 0) return 0;
+        return (
+          <Popover
+            trigger="hover"
+            position="top"
+            content={
+              <div style={{ maxWidth: 360 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  {t("rag.ui.columns.strategy", { _: "切割策略" })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {normalized.map((id) => {
+                    const opt = getStrategyOption(id);
+                    const label = opt?.label || `策略 ${id}`;
+                    return (
+                      <Tag
+                        key={id}
+                        size="small"
+                        style={{ cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStrategyDetail(id);
+                        }}
+                      >
+                        {label}
+                      </Tag>
+                    );
+                  })}
+                </div>
+              </div>
+            }
+          >
+            <span style={{ cursor: "pointer" }}>{count}</span>
+          </Popover>
+        );
+      },
     },
     {
       title: t("rag.ui.columns.uploadedBy", { _: "上传者" }),
@@ -278,7 +430,7 @@ const RagPage: React.FC = () => {
       ),
       width: 80,
     },
-    ...(!isDefaultTenant
+    ...(!isSuperAdmin && !isDefaultTenant
       ? [
           {
             title: t("rag.ui.columns.tenant", { _: "租户" }),
@@ -348,6 +500,39 @@ const RagPage: React.FC = () => {
 
   return (
     <div style={{ paddingTop: "30px" }}>
+      {uploadStatusText && (
+        <Card
+          bordered
+          style={{
+            marginBottom: 16,
+          }}
+        >
+          <Space
+            align="center"
+            style={{ width: "100%", justifyContent: "space-between" }}
+          >
+            <div>
+              <div style={{ marginBottom: 8 }}>{uploadStatusText}</div>
+              <Progress
+                percent={uploadProgress}
+                style={{ minWidth: 260, maxWidth: 480 }}
+              />
+            </div>
+            <Button
+              type="primary"
+              status="danger"
+              onClick={handleCancelUpload}
+              disabled={
+                !uploadState ||
+                !["hashing", "uploading"].includes(uploadStatus) ||
+                !uploading
+              }
+            >
+              {t("rag.ui.cancel", { _: "取消上传" })}
+            </Button>
+          </Space>
+        </Card>
+      )}
       <div
         style={{
           display: "flex",
@@ -363,7 +548,7 @@ const RagPage: React.FC = () => {
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
-            {!isDefaultTenant && (
+            {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => setScope("tenant")}

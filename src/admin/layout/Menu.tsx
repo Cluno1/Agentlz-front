@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Menu as RAMenu, usePermissions, useTranslate } from "react-admin";
 import {
   People,
@@ -9,6 +9,7 @@ import {
   Create,
   Description,
   Chat,
+  Assessment,
 } from "@mui/icons-material";
 import SubMenu from "../components/SubMenu";
 
@@ -16,6 +17,14 @@ export const Menu = () => {
   const translate = useTranslate();
   const { permissions } = usePermissions();
   const [open, setOpen] = useState(false);
+  const tenantId =
+    localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default";
+  const isSuperAdmin = useMemo(
+    () =>
+      permissions === "admin" &&
+      (tenantId === "system" || tenantId === "default"),
+    [permissions, tenantId],
+  );
 
   const handleToggle = () => {
     setOpen(!open);
@@ -50,6 +59,11 @@ export const Menu = () => {
         primaryText={translate("menu.create")}
         leftIcon={<Create />}
       />
+      <RAMenu.Item
+        to="/evaluation"
+        primaryText={translate("menu.evaluation")}
+        leftIcon={<Assessment />}
+      />
       {permissions === "admin" && (
         <SubMenu
           handleToggle={handleToggle}
@@ -67,6 +81,15 @@ export const Menu = () => {
             primaryText={translate("menu.systemManagement")}
             leftIcon={<Settings />}
           />
+          {isSuperAdmin && (
+            <RAMenu.Item
+              to="/tenant-management"
+              primaryText={translate("menu.tenantManagement", {
+                _: "租户管理",
+              })}
+              leftIcon={<Settings />}
+            />
+          )}
         </SubMenu>
       )}
       <RAMenu.Item

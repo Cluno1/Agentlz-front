@@ -61,6 +61,10 @@ export const UserManagement = () => {
         render: (v: string) => t(`user.role.${v}`) || v,
       },
       {
+        title: t("userManagement.columns.tenant", { _: "租户" }),
+        dataIndex: "tenant_id",
+      },
+      {
         title: t("userManagement.columns.disabled"),
         dataIndex: "disabled",
         sorter: true,

@@ -15,4 +15,5 @@ export type MockUser = {
   createdAt?: string;
   // 创建人ID,如果为空则是系统默认创建或者自己注册
   createdById?: string;
+  tenant_id?: string;
 };

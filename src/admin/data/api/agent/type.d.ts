@@ -17,11 +17,17 @@ export interface PaginationResult<T> {
   [k: string]: any;
 }
 
+export interface AgentDocumentBinding {
+  id: string;
+  strategy?: number[];
+  [k: string]: any;
+}
+
 /** @description Agent 列表 */
 export namespace ListAgentsNameSpace {
   /** @description Agent 列表 参数 */
   export interface ListAgentsParams extends PaginationParams {
-    type?: "self" | "tenant";
+    type?: "self" | "tenant" | "system";
     [k: string]: any;
   }
 
@@ -30,9 +36,13 @@ export namespace ListAgentsNameSpace {
     id?: number;
     name?: string;
     description?: string | null;
+    system_prompt?: string | null;
     disabled?: boolean;
     mcp_agent_ids?: number[];
+    mcp_agents?: Array<{ id: number; name: string }>;
     document_ids?: string[];
+    documents?: Array<{ id: string; name: string }>;
+    meta?: Record<string, any> | null;
     tenant_id?: string;
     created_at?: string;
     created_by_id?: string | number;
@@ -55,9 +65,11 @@ export namespace CreateAgentNameSpace {
   export interface CreateAgentParams {
     name: string;
     description?: string;
+    system_prompt?: string;
+    meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
-    document_ids?: string[];
+    documents?: AgentDocumentBinding[];
     [k: string]: any;
   }
   /** @description 创建 Agent 返回结果 */
@@ -73,9 +85,11 @@ export namespace UpdateAgentNameSpace {
   export interface UpdateAgentParams {
     name?: string;
     description?: string;
+    system_prompt?: string;
+    meta?: Record<string, any>;
     disabled?: boolean;
     mcp_agent_ids?: number[];
-    document_ids?: string[];
+    documents?: AgentDocumentBinding[];
     [k: string]: any;
   }
   /** @description 更新 Agent 返回结果 */

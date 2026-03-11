@@ -273,20 +273,37 @@ const Chat: React.FC = () => {
         content: string;
         createdAt: number;
       }> = [];
+      const pickText = (v: unknown): string | undefined => {
+        if (typeof v === "string") return v;
+        if (!v || typeof v !== "object") return undefined;
+        const vv = v as Record<string, unknown>;
+        const text = vv.text ?? vv.content ?? vv.message ?? vv.value;
+        return typeof text === "string" ? text : undefined;
+      };
+      const getCount = (v: unknown): number | undefined => {
+        if (typeof v === "number" && Number.isFinite(v)) return v;
+        if (typeof v === "string") {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : undefined;
+        }
+        return undefined;
+      };
       for (const s of rows) {
         const ts = s.created_at
           ? new Date(s.created_at).getTime()
           : s.time
             ? new Date(String(s.time)).getTime()
             : Date.now();
-        const input = typeof s.input === "string" ? s.input : undefined;
-        const output = typeof s.output === "string" ? s.output : undefined;
+        const count = getCount((s as { count?: unknown }).count);
+        const orderKey = count != null ? count : ts;
+        const input = pickText((s as { input?: unknown }).input);
+        const output = pickText((s as { output?: unknown }).output);
         if (input && input.trim()) {
           list.push({
             id: `${String(s.id ?? Math.random())}-u`,
             role: "user",
             content: input,
-            createdAt: ts,
+            createdAt: orderKey * 2,
           });
         }
         if (output && output.trim()) {
@@ -294,17 +311,22 @@ const Chat: React.FC = () => {
             id: `${String(s.id ?? Math.random())}-a`,
             role: "assistant",
             content: output,
-            createdAt: ts + 1,
+            createdAt: orderKey * 2 + 1,
           });
         }
         if ((!input || !input.trim()) && (!output || !output.trim())) {
-          const content = String(s.content ?? s.message ?? "");
+          const content = String(
+            pickText((s as { content?: unknown }).content) ??
+              pickText((s as { message?: unknown }).message) ??
+              pickText((s as { zip?: unknown }).zip) ??
+              "",
+          );
           if (content) {
             list.push({
               id: `${String(s.id ?? Math.random())}-m`,
               role: (s.role as "user" | "assistant" | "system") || "assistant",
               content,
-              createdAt: ts,
+              createdAt: orderKey * 2,
             });
           }
         }

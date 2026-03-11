@@ -3,11 +3,40 @@ export default {
     loading: "Loading...",
     save: "Save",
     cancel: "Cancel",
+    back: "Back",
+    confirm: "Confirm",
     success: "Success",
     error: "Error",
     reload: "Reload",
+    yes: "Yes",
+    no: "No",
+  },
+  evaluation: {
+    title: "Agent Evaluation",
+    tabs: {
+      observe: "Observation",
+      evaluate: "Evaluation",
+    },
+    ui: {
+      questionCol: "Question Column",
+      answerCol: "Answer Column",
+      start: "Start Evaluation",
+      accuracy: "Accuracy",
+      avgTime: "Average Time",
+      columns: {
+        question: "Question",
+        expected: "Expected",
+        answer: "Answer",
+        time: "Time (ms)",
+        correct: "Correct",
+      },
+    },
+    msg: {
+      xlsxUnsupported: "xlsx parsing is not supported, please use CSV",
+    },
   },
   menu: {
+    evaluation: "Evaluation",
     profile: "Profile",
     logout: "Logout",
     dashboard: "Dashboard",
@@ -94,6 +123,7 @@ export default {
         fullName: "Full Name",
         role: "Role",
         avatar: "Avatar URL",
+        tenant: "Tenant",
         disabled: "Disabled Login",
         createdAt: "Created At",
       },
@@ -111,6 +141,7 @@ export default {
         fullName: "Full Name",
         role: "Role",
         avatar: "Avatar URL",
+        tenant: "Tenant",
         disabled: "Disabled Login",
         password: "Password",
       },
@@ -135,6 +166,7 @@ export default {
       tabs: {
         self: "Personal",
         tenant: "Tenant",
+        system: "System",
       },
       create: "Create Agent",
       searchPlaceholder: "Search by name/description",
@@ -167,9 +199,22 @@ export default {
         apiKey: "API Key",
         type: "Type",
       },
+      systemPrompt: "System Prompt",
+      systemPromptPlaceholder: "Write system prompt (paste or fill from file)",
+      uploadPrompt: "Fill from file",
       baseMessage: "Base Message",
       ragMessage: "RAG Message",
       mcpMessage: "MCP Message",
+      modelMessage: "Model Selection",
+      modelSource: "Model Source",
+      "modelSource.system": "System Model",
+      "modelSource.openai": "Custom OpenAI Model",
+      "modelSource.custom": "Custom Model",
+      manufacturer: "Vendor",
+      tags: "Tags",
+      price: "Price",
+      modelDefault: "System Default",
+      modelSearchPlaceholder: "Search name/vendor/tags/description",
       preview: {
         reply: "This is a preview reply",
       },
@@ -191,7 +236,7 @@ export default {
     placeholder: "This is a placeholder content for MCP Tools page.",
     ui: {
       subtitle: "Global platform listing 30,000+ MCP Servers",
-      searchPlaceholder: "Search name/tags/description",
+      searchPlaceholder: "Search by name",
       categories: {
         all: "All",
         llm: "LLM",
@@ -289,5 +334,10 @@ export default {
   create: {
     title: "Create",
     placeholder: "This is a placeholder content for Create page.",
+  },
+  model: {
+    msg: {
+      loadFail: "Load failed",
+    },
   },
 };

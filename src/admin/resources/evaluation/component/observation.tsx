@@ -22,11 +22,13 @@ import type { ListMcpNameSpace } from "../../../data/api/mcp/type";
 import {
   listAgentChatHistory,
   listAgentChatSessions,
-  chatAgentStream,
+  observationAgentStream,
 } from "../../../data/api/agent";
 import { listModels, getModel } from "../../../data/api/model";
 import type { ListModelsNameSpace } from "../../../data/api/model/type";
 import { getStrategyOption } from "../../rag/rag/strategyOptions";
+import { wsClient } from "../../../data/wsClient";
+import type { WSMessage } from "../../../data/wsClient";
 
 type Props = {
   active: "base" | "rag" | "mcp" | "model";
@@ -841,7 +843,11 @@ const Observation: React.FC<Props> = ({
     const controller = new AbortController();
     try {
       const meta: Record<string, unknown> =
-        recordMeta ?? ({ uid: identity?.id, ts: Date.now() } as const);
+        recordMeta ??
+        ({
+          user_id: String(identity?.id ?? ""),
+          ts: Date.now(),
+        } as const);
       if (!recordMeta) setRecordMeta(meta);
       const type = recordId ? 1 : 0;
       const payload = {
@@ -854,7 +860,7 @@ const Observation: React.FC<Props> = ({
       setMessages((prev) => [...prev, { role: "user", content: input }]);
       setInput("");
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-      for await (const chunk of chatAgentStream(payload, {
+      for await (const chunk of observationAgentStream(payload, {
         signal: controller.signal,
       })) {
         if (typeof chunk?.record_id === "number" && !recordId) {
@@ -1086,9 +1092,427 @@ const Observation: React.FC<Props> = ({
     </Card>
   );
 
+  const [obsRows, setObsRows] = useState<
+    Array<{
+      id: string;
+      agent_id?: number;
+      record_id: number;
+      message: string;
+      messages: string[];
+      doc: string;
+      history: string;
+      rag_time_ms?: number;
+      model_time_ms?: number;
+      first_char_time_ms?: number;
+      input_tokens?: number;
+      output_tokens?: number;
+      model_name?: string;
+    }>
+  >([]);
+
+  const buildObsDetailText = (row: (typeof obsRows)[number]): string => {
+    const messagesText =
+      Array.isArray(row.messages) && row.messages.length
+        ? row.messages.join("\n")
+        : "-";
+    const parts: string[] = [];
+    parts.push(
+      `${t("chat.ui.columns.id", { _: "记录ID" })}: ${row.record_id || "-"}`,
+    );
+    if (row.model_name) {
+      parts.push(
+        `${t("rag.ui.columns.modelName", { _: "模型名称" })}: ${
+          row.model_name
+        }`,
+      );
+    }
+    parts.push(
+      `${t("chat.ui.columns.message", { _: "问题" })}: ${row.message || "-"}`,
+    );
+    parts.push(
+      `${t("rag.ui.columns.messages", { _: "检索短句" })}:\n${messagesText}`,
+    );
+    parts.push(
+      `${t("rag.ui.columns.doc", { _: "文档预览" })}:\n${row.doc || "-"}`,
+    );
+    parts.push(
+      `${t("rag.ui.columns.history", { _: "历史摘要" })}:\n${
+        row.history || "-"
+      }`,
+    );
+    const metrics: string[] = [];
+    if (typeof row.rag_time_ms === "number") {
+      metrics.push(
+        `${t("rag.ui.columns.ragTimeMs", { _: "检索耗时(ms)" })}: ${
+          row.rag_time_ms
+        }`,
+      );
+    }
+    if (typeof row.model_time_ms === "number") {
+      metrics.push(
+        `${t("rag.ui.columns.modelTimeMs", { _: "模型耗时(ms)" })}: ${
+          row.model_time_ms
+        }`,
+      );
+    }
+    if (typeof row.first_char_time_ms === "number") {
+      metrics.push(
+        `${t("rag.ui.columns.firstCharTimeMs", { _: "首字符时间(ms)" })}: ${
+          row.first_char_time_ms
+        }`,
+      );
+    }
+    if (typeof row.input_tokens === "number") {
+      metrics.push(
+        `${t("rag.ui.columns.inputTokens", { _: "输入Tokens" })}: ${
+          row.input_tokens
+        }`,
+      );
+    }
+    if (typeof row.output_tokens === "number") {
+      metrics.push(
+        `${t("rag.ui.columns.outputTokens", { _: "输出Tokens" })}: ${
+          row.output_tokens
+        }`,
+      );
+    }
+    if (metrics.length) {
+      parts.push(metrics.join(" | "));
+    }
+    return parts.join("\n\n");
+  };
+
+  useEffect(() => {
+    const handler = (msg: WSMessage) => {
+      if (!msg || typeof msg.type !== "string") return;
+      if (msg.type !== "rag.observation") return;
+      const data = (msg.data || {}) as {
+        agent_id?: number;
+        record_id?: number;
+        doc?: string;
+        history?: string;
+        message?: string;
+        messages?: unknown;
+        metrics?: {
+          rag_time_ms?: number;
+          model_time_ms?: number;
+          first_char_time_ms?: number;
+          input_tokens?: number;
+          output_tokens?: number;
+          model_name?: string;
+        };
+      };
+      const aid = Number(data.agent_id || 0);
+      if (
+        agentId &&
+        !Number.isNaN(Number(agentId)) &&
+        aid &&
+        aid !== Number(agentId)
+      )
+        return;
+      const m = (data.metrics || {}) as {
+        rag_time_ms?: number;
+        model_time_ms?: number;
+        first_char_time_ms?: number;
+        input_tokens?: number;
+        output_tokens?: number;
+        model_name?: string;
+      };
+      const row = {
+        id: `${Date.now()}-${Math.random()}`,
+        agent_id: aid || undefined,
+        record_id: Number(data.record_id || 0),
+        message: typeof data.message === "string" ? data.message : "",
+        messages: Array.isArray(data.messages)
+          ? (data.messages as unknown[]).map((x) => String(x))
+          : [],
+        doc: typeof data.doc === "string" ? data.doc : "",
+        history: typeof data.history === "string" ? data.history : "",
+        rag_time_ms:
+          typeof m.rag_time_ms === "number" && Number.isFinite(m.rag_time_ms)
+            ? m.rag_time_ms
+            : undefined,
+        model_time_ms:
+          typeof m.model_time_ms === "number" &&
+          Number.isFinite(m.model_time_ms)
+            ? m.model_time_ms
+            : undefined,
+        first_char_time_ms:
+          typeof m.first_char_time_ms === "number" &&
+          Number.isFinite(m.first_char_time_ms)
+            ? m.first_char_time_ms
+            : undefined,
+        input_tokens:
+          typeof m.input_tokens === "number" && Number.isFinite(m.input_tokens)
+            ? m.input_tokens
+            : undefined,
+        output_tokens:
+          typeof m.output_tokens === "number" && Number.isFinite(m.output_tokens)
+            ? m.output_tokens
+            : undefined,
+        model_name: typeof m.model_name === "string" ? m.model_name : undefined,
+      };
+      setObsRows((prev) => {
+        const rid = row.record_id;
+        if (!rid) return [row, ...prev].slice(0, 100);
+        const hasValue = (v: unknown): boolean => {
+          if (v === undefined || v === null) return false;
+          if (typeof v === "string") return v.trim().length > 0;
+          if (Array.isArray(v)) return v.length > 0;
+          if (typeof v === "number") return Number.isFinite(v);
+          return true;
+        };
+        let merged = false;
+        const next = prev.map((it) => {
+          if (it.record_id !== rid) return it;
+          merged = true;
+          return {
+            ...it,
+            agent_id: hasValue(row.agent_id) ? row.agent_id : it.agent_id,
+            message: hasValue(row.message) ? row.message : it.message,
+            messages: hasValue(row.messages) ? row.messages : it.messages,
+            doc: hasValue(row.doc) ? row.doc : it.doc,
+            history: hasValue(row.history) ? row.history : it.history,
+            rag_time_ms: hasValue(row.rag_time_ms)
+              ? row.rag_time_ms
+              : it.rag_time_ms,
+            model_time_ms: hasValue(row.model_time_ms)
+              ? row.model_time_ms
+              : it.model_time_ms,
+            first_char_time_ms: hasValue(row.first_char_time_ms)
+              ? row.first_char_time_ms
+              : it.first_char_time_ms,
+            input_tokens: hasValue(row.input_tokens)
+              ? row.input_tokens
+              : it.input_tokens,
+            output_tokens: hasValue(row.output_tokens)
+              ? row.output_tokens
+              : it.output_tokens,
+            model_name: hasValue(row.model_name)
+              ? row.model_name
+              : it.model_name,
+          };
+        });
+        if (merged) return next;
+        return [row, ...prev].slice(0, 100);
+      });
+    };
+    wsClient.onMessage(handler);
+    return () => {
+      wsClient.offMessage(handler);
+    };
+  }, [agentId]);
+
+  const obsColumns: Array<{
+    title: React.ReactNode;
+    dataIndex: string;
+    width?: number;
+    render?: (
+      value: unknown,
+      record: (typeof obsRows)[number],
+    ) => React.ReactNode;
+  }> = [
+    {
+      title: t("chat.ui.columns.id", { _: "记录ID" }),
+      dataIndex: "record_id",
+      width: 80,
+    },
+    {
+      title: t("chat.ui.columns.message", { _: "问题" }),
+      dataIndex: "message",
+      width: 240,
+      render: (v: unknown) => (
+        <Typography.Paragraph
+          style={{ marginBottom: 0 }}
+          ellipsis={{ rows: 2 }}
+        >
+          {typeof v === "string" ? v : String(v ?? "")}
+        </Typography.Paragraph>
+      ),
+    },
+    {
+      title: t("rag.ui.columns.messages", { _: "检索短句" }),
+      dataIndex: "messages",
+      width: 100,
+      render: (v: unknown) => {
+        const arr = Array.isArray(v)
+          ? (v as unknown[]).map((x) => String(x ?? ""))
+          : [];
+        const items = arr.filter(Boolean);
+        if (!items.length) return "-";
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {items.map((text, idx) => (
+              <Tag key={`${text}-${idx}`} size="small">
+                {text}
+              </Tag>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
+      title: t("rag.ui.columns.ragTimeMs", { _: "检索耗时(ms)" }),
+      dataIndex: "rag_time_ms",
+      width: 90,
+      render: (v: unknown) => {
+        const n = typeof v === "number" && Number.isFinite(v) ? v : undefined;
+        return typeof n === "number" ? n : "-";
+      },
+    },
+    {
+      title: t("rag.ui.columns.modelTimeMs", { _: "模型耗时(ms)" }),
+      dataIndex: "model_time_ms",
+      width: 90,
+      render: (v: unknown) => {
+        const n = typeof v === "number" && Number.isFinite(v) ? v : undefined;
+        return typeof n === "number" ? n : "-";
+      },
+    },
+    {
+      title: t("rag.ui.columns.firstCharTimeMs", { _: "首字符时间(ms)" }),
+      dataIndex: "first_char_time_ms",
+      width: 110,
+      render: (v: unknown) => {
+        const n = typeof v === "number" && Number.isFinite(v) ? v : undefined;
+        return typeof n === "number" ? n : "-";
+      },
+    },
+
+    {
+      title: t("rag.ui.columns.inputTokens", { _: "输入Tokens" }),
+      dataIndex: "input_tokens",
+      width: 90,
+      render: (v: unknown) => {
+        const n = typeof v === "number" && Number.isFinite(v) ? v : undefined;
+        return typeof n === "number" ? n : "-";
+      },
+    },
+    {
+      title: t("rag.ui.columns.outputTokens", { _: "输出Tokens" }),
+      dataIndex: "output_tokens",
+      width: 90,
+      render: (v: unknown) => {
+        const n = typeof v === "number" && Number.isFinite(v) ? v : undefined;
+        return typeof n === "number" ? n : "-";
+      },
+    },
+    {
+      title: t("rag.ui.columns.doc", { _: "文档预览" }),
+      dataIndex: "doc",
+      width: 100,
+      render: (v: unknown) => {
+        const text = typeof v === "string" ? v : String(v ?? "");
+        return (
+          <Typography.Paragraph
+            style={{ marginBottom: 0, cursor: "pointer" }}
+            ellipsis={{ rows: 3 }}
+            onClick={() => {
+              setObsDetailTitle(t("rag.ui.columns.doc", { _: "文档预览" }));
+              setObsDetailText(text);
+              setObsDetailVisible(true);
+            }}
+          >
+            {text}
+          </Typography.Paragraph>
+        );
+      },
+    },
+    {
+      title: t("rag.ui.columns.history", { _: "历史摘要" }),
+      dataIndex: "history",
+      width: 100,
+      render: (v: unknown) => {
+        const text = typeof v === "string" ? v : String(v ?? "");
+        return (
+          <Typography.Paragraph
+            style={{ marginBottom: 0, cursor: "pointer" }}
+            ellipsis={{ rows: 3 }}
+            onClick={() => {
+              setObsDetailTitle(t("rag.ui.columns.history", { _: "历史摘要" }));
+              setObsDetailText(text);
+              setObsDetailVisible(true);
+            }}
+          >
+            {text}
+          </Typography.Paragraph>
+        );
+      },
+    },
+  ];
+
+  const wsPreview = (
+    <Card
+      style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)", marginBottom: 12 }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <Space>
+          <Tag color="arcoblue">
+            {t("rag.ui.selected.count", { _: "已接收" })}: {obsRows.length}
+          </Tag>
+        </Space>
+        <Space>
+          <Button onClick={() => setObsRows([])}>
+            {t("common.clear", { _: "清空" })}
+          </Button>
+        </Space>
+      </div>
+      <Divider style={{ margin: "8px 0" }} />
+      <Table
+        style={{ maxWidth: "80%" }}
+        columns={obsColumns}
+        data={obsRows}
+        rowKey="id"
+        pagination={false}
+        scroll={{ y: 360 }}
+        onRow={(record) => ({
+          onClick: () => {
+            setObsDetailTitle(
+              t("rag.ui.observationDetail", { _: "观测上下文" }),
+            );
+            setObsDetailText(buildObsDetailText(record));
+            setObsDetailVisible(true);
+          },
+        })}
+      />
+    </Card>
+  );
+  const [obsDetailVisible, setObsDetailVisible] = useState(false);
+  const [obsDetailTitle, setObsDetailTitle] = useState("");
+  const [obsDetailText, setObsDetailText] = useState("");
+
   return (
     <div style={{ flex: 1 }}>
-      {active === "base" && chatPreview}
+      {active === "base" && (
+        <>
+          {chatPreview}
+          {wsPreview}
+          <Modal
+            title={obsDetailTitle || t("common.detail", { _: "详情" })}
+            visible={obsDetailVisible}
+            onCancel={() => setObsDetailVisible(false)}
+            onOk={() => setObsDetailVisible(false)}
+            style={{ maxWidth: "100%", width: "100%" }}
+          >
+            <div
+              style={{
+                whiteSpace: "pre-wrap",
+                maxHeight: "60vh",
+                overflow: "auto",
+              }}
+            >
+              {obsDetailText || "-"}
+            </div>
+          </Modal>
+        </>
+      )}
       {active === "rag" && ragPreview}
       {active === "mcp" && mcpPreview}
       {active === "model" && modelSource === "system" && modelPreview}

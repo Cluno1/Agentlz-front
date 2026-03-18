@@ -10,6 +10,13 @@ export default {
     reload: "Reload",
     yes: "Yes",
     no: "No",
+    websocket: {
+      disconnected: "WebSocket Disconnected",
+      disconnectedMessage:
+        "WebSocket is attempting to reconnect automatically. If it takes too long, please click the button below to retry.",
+      reconnect: "Reconnect Now",
+      connecting: "Connecting...",
+    },
   },
   evaluation: {
     title: "Agent Evaluation",

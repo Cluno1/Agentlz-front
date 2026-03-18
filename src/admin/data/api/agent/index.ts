@@ -298,3 +298,83 @@ export async function* chatAgentStream(
   }
   yield { done: true };
 }
+
+export async function* observationAgentStream(
+  payload: AgentChatInput,
+  opts?: { signal?: AbortSignal },
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  const base =
+    (httpClient.defaults as any)?.baseURL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "";
+  const tokenKey = import.meta.env.VITE_TOKEN_KEY as string;
+  const tenantKey = import.meta.env.VITE_TENANT_ID as string;
+  const token = tokenKey ? localStorage.getItem(tokenKey) : undefined;
+  const tenantId = tenantKey ? localStorage.getItem(tenantKey) : undefined;
+
+  const res = await fetch(`${base}/agent/observation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal: opts?.signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("观测接口请求失败");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() || "";
+    for (const evt of events) {
+      const dataLines = evt
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.replace(/^data:(?: )?/, ""));
+      if (dataLines.length === 0) continue;
+      const raw = dataLines.join("\n");
+      const fixed = raw.replace(
+        /(^|\n)(#{1,6})\n\s+([^\n]+)/g,
+        (_m, p, h, r) => (p ? "\n" : "") + h + " " + r,
+      );
+      const trimmedForControl = raw.trim();
+      if (trimmedForControl === "[DONE]") {
+        yield { done: true };
+        return;
+      }
+      let parsed: any = undefined;
+      const looksLikeJsonObject = /^\s*\{/.test(raw) || /^\s*\[/.test(raw);
+      if (looksLikeJsonObject) {
+        try {
+          parsed = JSON.parse(trimmedForControl);
+        } catch {
+          parsed = undefined;
+        }
+      }
+
+      if (parsed && typeof parsed === "object") {
+        if (
+          "delta" in parsed ||
+          "text" in parsed ||
+          "record_id" in parsed ||
+          "done" in parsed
+        ) {
+          yield parsed as AgentChatStreamChunk;
+          continue;
+        }
+      }
+
+      yield { delta: fixed };
+    }
+  }
+  yield { done: true };
+}

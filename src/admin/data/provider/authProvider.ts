@@ -3,6 +3,7 @@ import type { AuthProvider } from "react-admin";
 import { MockUser } from "../types/user";
 import { register as registerApi, login as loginApi } from "../api/auth";
 import type { RegisterNameSpace, LoginNameSpace } from "../api/auth/type";
+import { wsClient } from "../wsClient";
 
 const TOKEN_KEY = import.meta.env.VITE_TOKEN_KEY;
 const IDENTITY_KEY = import.meta.env.VITE_IDENTITY_KEY;
@@ -44,9 +45,11 @@ export const authProvider: AuthProvider = {
         createdById: res.user?.created_by_id || "",
       }),
     );
+    wsClient.connect();
     return Promise.resolve();
   },
   logout: async () => {
+    wsClient.disconnect();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(IDENTITY_KEY);
     localStorage.removeItem(TENANT_ID);

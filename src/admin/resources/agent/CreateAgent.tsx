@@ -122,7 +122,7 @@ const CreateAgent: React.FC = () => {
     }
   };
 
-  const fetchMcps = async (opts?: { silent?: boolean }) => {
+  const fetchMcps = async (opts?: { silent?: boolean; scope?: "self" | "tenant" | "system" }) => {
     setMcpLoading(true);
     try {
       const { data } = await listMcps({
@@ -131,7 +131,7 @@ const CreateAgent: React.FC = () => {
         sortField: "id",
         sortOrder: "DESC",
         filter: { q: mcpQuery },
-        type: mcpScope,
+        type: opts?.scope ?? mcpScope,
       });
       setMcpItems(data || []);
     } catch {
@@ -694,21 +694,21 @@ const CreateAgent: React.FC = () => {
           <Button.Group>
             <Button
               type={mcpScope === "self" ? "primary" : "outline"}
-              onClick={() => setMcpScope("self")}
+              onClick={() => { setMcpScope("self"); void fetchMcps({ scope: "self" }); }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
             {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={mcpScope === "tenant" ? "primary" : "outline"}
-                onClick={() => setMcpScope("tenant")}
+                onClick={() => { setMcpScope("tenant"); void fetchMcps({ scope: "tenant" }); }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
             <Button
               type={mcpScope === "system" ? "primary" : "outline"}
-              onClick={() => setMcpScope("system")}
+              onClick={() => { setMcpScope("system"); void fetchMcps({ scope: "system" }); }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>

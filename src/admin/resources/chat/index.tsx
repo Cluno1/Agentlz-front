@@ -16,14 +16,20 @@ import {
 import { IconUser, IconCopy, IconSearch } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
-import { chatAgentStream, listAgentChatSessions } from "../../data/api/agent";
+import {
+  chainPdcStream,
+  chatAgentStream,
+  listAgentChatSessions,
+} from "../../data/api/agent";
 import type {
   AgentChatInput,
   AgentChatStreamChunk,
+  PdcEventEnvelope,
 } from "../../data/api/agent/type";
 import HistoryDrawer from "./components/HistoryDrawer";
 import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
+import PdcTracePanel from "./components/PdcTracePanel";
 type ApiAgentRow = {
   id?: number | string;
   agent_id?: number | string;
@@ -32,6 +38,21 @@ type ApiAgentRow = {
   avatar?: string;
   tags?: string[];
 };
+
+function pdcPayloadToText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function assistantTextFromPdcEvent(event: PdcEventEnvelope): string {
+  if (event.evt !== "final") return "";
+  return pdcPayloadToText(event.payload);
+}
 
 const Chat: React.FC = () => {
   const t = useTranslate();
@@ -56,6 +77,8 @@ const Chat: React.FC = () => {
   const [steps, setSteps] = useState<
     Array<{ step: string; detail?: Record<string, unknown> }>
   >([]);
+  const [chatMode, setChatMode] = useState<"chat" | "pdc">("chat");
+  const [pdcEvents, setPdcEvents] = useState<PdcEventEnvelope[]>([]);
   /** 流式中止标记（用于用户点击“停止”） */
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   /** 当前流式请求的 AbortController */
@@ -162,11 +185,22 @@ const Chat: React.FC = () => {
     [agents, agentId],
   );
 
+  const appendPdcEvent = React.useCallback((event: PdcEventEnvelope) => {
+    setPdcEvents((prev) => [...prev, event]);
+    if (event.evt === "chain.step") {
+      const step = String(event.payload || "");
+      if (step) {
+        setSteps((prev) => [...prev, { step, detail: { trace_id: event.trace_id } }]);
+      }
+    }
+  }, []);
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || !agentId || streaming) return;
     // 清空当前的步骤
     setSteps([]);
+    setPdcEvents([]);
     streamAbortRef.current.aborted = false;
     const ts = Date.now();
     const assistantId = `${ts}-a`;
@@ -192,36 +226,57 @@ const Chat: React.FC = () => {
     try {
       abortCtrlRef.current = new AbortController();
       const isContinue = recordId != null;
-      const payload: AgentChatInput = {
-        agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
-        type: (isContinue ? 1 : 0) as 0 | 1,
-        meta: { user_id: String(identity?.id ?? "") },
-        message: text,
-        ...(isContinue ? { record_id: recordId as number } : {}),
-      };
-      const gen = chatAgentStream(payload, {
-        signal: abortCtrlRef.current.signal,
-      });
-      for await (const chunk of gen as AsyncGenerator<
-        AgentChatStreamChunk & { record_id?: number },
-        void,
-        unknown
-      >) {
-        if (streamAbortRef.current.aborted) break;
-        if (chunk?.record_id != null && recordId == null) {
-          const rid = Number(chunk.record_id);
-          if (!Number.isNaN(rid)) setRecordId(rid);
-        }
+      const appendAssistant = (content: string) => {
+        if (!content) return;
         setMessages((prev) => {
           const next = [...prev];
           const idx = next.findIndex((m) => m.id === assistantIdRef.current);
           if (idx !== -1)
             next[idx] = {
               ...next[idx],
-              content: next[idx].content + (chunk.delta || chunk.text || ""),
+              content: next[idx].content + content,
             };
           return next;
         });
+      };
+
+      const gen =
+        chatMode === "pdc"
+          ? chainPdcStream(
+              { user_input: text, max_steps: 6 },
+              { signal: abortCtrlRef.current.signal },
+            )
+          : chatAgentStream(
+              {
+                agent_id: Number.isNaN(Number(agentId))
+                  ? undefined
+                  : Number(agentId),
+                type: (isContinue ? 1 : 0) as 0 | 1,
+                meta: { user_id: String(identity?.id ?? "") },
+                message: text,
+                ...(isContinue ? { record_id: recordId as number } : {}),
+              } as AgentChatInput,
+              {
+                signal: abortCtrlRef.current.signal,
+              },
+            );
+
+      for await (const chunk of gen as AsyncGenerator<
+        AgentChatStreamChunk & { record_id?: number },
+        void,
+        unknown
+      >) {
+        if (streamAbortRef.current.aborted) break;
+        if (chunk.event) {
+          appendPdcEvent(chunk.event);
+          appendAssistant(assistantTextFromPdcEvent(chunk.event));
+          continue;
+        }
+        if (chunk?.record_id != null && recordId == null) {
+          const rid = Number(chunk.record_id);
+          if (!Number.isNaN(rid)) setRecordId(rid);
+        }
+        appendAssistant(chunk.delta || chunk.text || "");
         if (chunk.done) break;
       }
     } catch (e) {
@@ -438,6 +493,7 @@ const Chat: React.FC = () => {
           onClick={() => {
             setMessages([]);
             setSteps([]);
+            setPdcEvents([]);
             streamAbortRef.current.aborted = false;
             abortCtrlRef.current?.abort();
             setStreaming(false);
@@ -589,18 +645,43 @@ const Chat: React.FC = () => {
               onChange={setInput}
               onPressEnter={(e) => handleEnter(input, e)}
             />
-            <Space>
-              <Button
-                type="primary"
-                onClick={handleSend}
-                disabled={!agentId || streaming}
-              >
-                {t("agent.ui.send", { _: "发送" })}
-              </Button>
-              <Button onClick={handleStop} disabled={!streaming}>
-                {t("agent.ui.stop", { _: "停止" })}
-              </Button>
-            </Space>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                alignItems: "stretch",
+              }}
+            >
+              <Button.Group>
+                <Button
+                  type={chatMode === "chat" ? "primary" : "secondary"}
+                  disabled={streaming}
+                  onClick={() => setChatMode("chat")}
+                >
+                  对话
+                </Button>
+                <Button
+                  type={chatMode === "pdc" ? "primary" : "secondary"}
+                  disabled={streaming}
+                  onClick={() => setChatMode("pdc")}
+                >
+                  执行
+                </Button>
+              </Button.Group>
+              <Space>
+                <Button
+                  type="primary"
+                  onClick={handleSend}
+                  disabled={!agentId || streaming}
+                >
+                  {t("agent.ui.send", { _: "发送" })}
+                </Button>
+                <Button onClick={handleStop} disabled={!streaming}>
+                  {t("agent.ui.stop", { _: "停止" })}
+                </Button>
+              </Space>
+            </div>
           </div>
         </Card>
       </div>
@@ -791,7 +872,10 @@ const Chat: React.FC = () => {
               </div>
             )}
           </div>
-          {steps.length > 0 && (
+          {pdcEvents.length > 0 && (
+            <PdcTracePanel events={pdcEvents} isDark={isDark} />
+          )}
+          {steps.length > 0 && pdcEvents.length === 0 && (
             <div
               style={{
                 marginTop: 16,
@@ -837,6 +921,7 @@ const Chat: React.FC = () => {
           if (!Number.isNaN(rid) && rid !== recordId) {
             setMessages([]);
             setSteps([]);
+            setPdcEvents([]);
             continueRef.current = true;
             setSessionsPage(1);
             setRecordId(rid);

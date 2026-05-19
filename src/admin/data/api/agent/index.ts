@@ -219,10 +219,7 @@ export async function listAgentChatSessions(
   }
 }
 
-export async function* chatAgentStream(
-  payload: AgentChatInput,
-  opts?: { signal?: AbortSignal },
-): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+function getStreamAuth() {
   const base =
     (httpClient.defaults as any)?.baseURL ||
     import.meta.env.VITE_API_BASE_URL ||
@@ -231,20 +228,14 @@ export async function* chatAgentStream(
   const tenantKey = import.meta.env.VITE_TENANT_ID as string;
   const token = tokenKey ? localStorage.getItem(tokenKey) : undefined;
   const tenantId = tenantKey ? localStorage.getItem(tenantKey) : undefined;
+  return { base, token, tenantId };
+}
 
-  const res = await fetch(`${base}/agent/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
-    },
-    body: JSON.stringify(payload),
-    signal: opts?.signal,
-  });
-  if (!res.ok || !res.body) {
-    throw new Error("聊天接口请求失败");
+async function* readSseStream(
+  res: Response,
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  if (!res.body) {
+    throw new Error("流式响应为空");
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
@@ -283,6 +274,13 @@ export async function* chatAgentStream(
 
       if (parsed && typeof parsed === "object") {
         if (
+          typeof parsed.evt === "string" &&
+          Object.prototype.hasOwnProperty.call(parsed, "payload")
+        ) {
+          yield { event: parsed as AgentChatStreamChunk["event"] };
+          continue;
+        }
+        if (
           "delta" in parsed ||
           "text" in parsed ||
           "record_id" in parsed ||
@@ -297,4 +295,49 @@ export async function* chatAgentStream(
     }
   }
   yield { done: true };
+}
+
+export async function* chatAgentStream(
+  payload: AgentChatInput,
+  opts?: { signal?: AbortSignal },
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  const { base, token, tenantId } = getStreamAuth();
+  const res = await fetch(`${base}/agent/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal: opts?.signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("聊天接口请求失败");
+  }
+  yield* readSseStream(res);
+}
+
+export async function* chainPdcStream(
+  params: { user_input: string; max_steps?: number },
+  opts?: { signal?: AbortSignal },
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  const { base, token, tenantId } = getStreamAuth();
+  const url = new URL(`${base}/chat`, window.location.origin);
+  url.searchParams.set("user_input", params.user_input);
+  if (params.max_steps) url.searchParams.set("max_steps", String(params.max_steps));
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    },
+    signal: opts?.signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("执行链路请求失败");
+  }
+  yield* readSseStream(res);
 }

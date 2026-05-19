@@ -138,6 +138,62 @@ export interface AgentChatStreamChunk {
   delta?: string;
   text?: string;
   done?: boolean;
+  event?: PdcEventEnvelope;
+  [k: string]: any;
+}
+
+export interface McpConfigItem {
+  name?: string;
+  transport?: string;
+  command?: string;
+  args?: string[];
+  [k: string]: any;
+}
+
+export interface WorkflowPlan {
+  execution_chain?: string[];
+  mcp_config?: McpConfigItem[];
+  instructions?: string;
+  [k: string]: any;
+}
+
+export interface ToolCall {
+  name?: string;
+  status?: string;
+  input?: string;
+  output?: string;
+  server?: string;
+  [k: string]: any;
+}
+
+export interface ToolAssessment {
+  mcp_id?: string;
+  server?: string;
+  status?: string;
+  raw_input?: string;
+  raw_output?: string;
+  error_msg?: string;
+  micro_score?: number;
+  micro_judge?: boolean;
+  micro_reason?: string;
+  [k: string]: any;
+}
+
+export interface CheckOutput {
+  judge?: boolean;
+  score?: number;
+  reasoning?: string;
+  tool_assessments?: ToolAssessment[];
+  [k: string]: any;
+}
+
+export interface PdcEventEnvelope {
+  evt: string;
+  seq?: number;
+  ts?: string;
+  trace_id?: string;
+  schema_version?: string;
+  payload?: any;
   [k: string]: any;
 }
 export interface AgentChatHistoryInput {

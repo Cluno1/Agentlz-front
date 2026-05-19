@@ -29,6 +29,7 @@ import HistoryDrawer from "./components/HistoryDrawer";
 import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
 import PdcTracePanel from "./components/PdcTracePanel";
+import { dispatchSseChunk } from "./sseRegistry";
 type ApiAgentRow = {
   id?: number | string;
   agent_id?: number | string;
@@ -257,17 +258,15 @@ const Chat: React.FC = () => {
         unknown
       >) {
         if (streamAbortRef.current.aborted) break;
-        if (chunk.event) {
-          appendPdcEvent(chunk.event);
-          appendAssistant(assistantTextFromPdcEvent(chunk.event));
-          continue;
-        }
-        if (chunk?.record_id != null && recordId == null) {
-          const rid = Number(chunk.record_id);
-          if (!Number.isNaN(rid)) setRecordId(rid);
-        }
-        appendAssistant(chunk.delta || chunk.text || "");
-        if (chunk.done) break;
+        const _stop = dispatchSseChunk(chunk, {
+          appendPdcEvent,
+          appendAssistant,
+          assistantTextFromPdcEvent,
+          onRecordId: (id: number) => {
+            if (recordId == null && !Number.isNaN(id)) setRecordId(id);
+          },
+        });
+        if (_stop) break;
       }
     } catch (e) {
       Message.error(t("agent.msg.streamFail", { _: "流式失败" }));

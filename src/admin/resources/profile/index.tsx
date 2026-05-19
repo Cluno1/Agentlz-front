@@ -16,6 +16,7 @@ import {
 import { useTranslate, useGetIdentity } from "react-admin";
 import { useNavigate } from "react-router-dom";
 import { getUser } from "../../data/api/user";
+import { listTenants } from "../../data/api/system/tenant";
 import { useDarkMode } from "../../data/hook/useDark";
 
 const ProfileShow = () => {
@@ -24,6 +25,7 @@ const ProfileShow = () => {
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string>("");
   const navigate = useNavigate();
   const { textColor, cardColorStyle } = useDarkMode();
   const isDefaultTenant =
@@ -43,6 +45,16 @@ const ProfileShow = () => {
 
         if (profile) {
           form.setFieldsValue(profile);
+          try {
+            const _tid = (profile as any)?.tenant_id;
+            if (_tid) {
+              const _tr = await listTenants({ page: 1, perPage: 100, sortField: "id", sortOrder: "ASC" });
+              const _hit = (_tr.data || []).find((x: any) => String(x.id) === String(_tid));
+              if (_hit && _hit.name) setTenantName(String(_hit.name));
+            }
+          } catch (_e) {
+            /* 租户名解析失败则回退显示 id */
+          }
           localStorage.setItem(
             import.meta.env.VITE_IDENTITY_KEY,
             JSON.stringify({
@@ -154,7 +166,7 @@ const ProfileShow = () => {
                         <div className="flex items-center gap-2">
                           {form.getFieldValue("tenant_id") && (
                             <Tag color="blue">
-                              {`${t("profile.fields.tenant")}: ${form.getFieldValue("tenant_id")}`}
+                              {`${t("profile.fields.tenant")}: ${tenantName || form.getFieldValue("tenant_id")}`}
                             </Tag>
                           )}
                         </div>
@@ -347,7 +359,7 @@ const ProfileShow = () => {
                       color: textColor,
                     }}
                   >
-                    {form.getFieldValue("tenant_id") || "-"}
+                    {tenantName || form.getFieldValue("tenant_id") || "-"}
                   </div>
                 </div>
               )}

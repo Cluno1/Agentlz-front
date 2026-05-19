@@ -16,7 +16,7 @@ import { createUser } from "../../../data/api/user";
 const UserCreate = () => {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-  const [tenantOptions, setTenantOptions] = useState<string[]>([]);
+  const [tenantOptions, setTenantOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [tenantLoading, setTenantLoading] = useState(false);
   const t = useTranslate();
   const { permissions } = usePermissions();
@@ -40,10 +40,7 @@ const UserCreate = () => {
           sortField: "id",
           sortOrder: "ASC",
         });
-        const ids = (resp.data || [])
-          .map((r: any) => r.id)
-          .filter(Boolean)
-          .map((v: any) => String(v));
+        const ids = (resp.data || []).filter((r: any) => r && r.id).map((r: any) => ({ id: String(r.id), name: String(r.name || r.id) }));
         setTenantOptions(ids);
       } catch {
         setTenantOptions([]);
@@ -140,21 +137,14 @@ const UserCreate = () => {
                     sortOrder: "ASC",
                     filter: { q: value },
                   });
-                  const ids = (resp.data || [])
-                    .map((r: any) => r.id)
-                    .filter(Boolean)
-                    .map((v: any) => String(v));
+                  const ids = (resp.data || []).filter((r: any) => r && r.id).map((r: any) => ({ id: String(r.id), name: String(r.name || r.id) }));
                   setTenantOptions(ids);
                 } finally {
                   setTenantLoading(false);
                 }
               }}
             >
-              {tenantOptions.map((tid) => (
-                <Select.Option key={tid} value={tid}>
-                  {tid}
-                </Select.Option>
-              ))}
+              {tenantOptions.map((opt) => (<Select.Option key={opt.id} value={opt.id}>{opt.name}</Select.Option>))}
             </Select>
           </Form.Item>
         )}

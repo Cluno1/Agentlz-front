@@ -320,13 +320,14 @@ export async function* chatAgentStream(
 }
 
 export async function* chainPdcStream(
-  params: { user_input: string; max_steps?: number },
+  params: { user_input: string; max_steps?: number; agent_id?: number },
   opts?: { signal?: AbortSignal },
 ): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
   const { base, token, tenantId } = getStreamAuth();
   const url = new URL(`${base}/chat`, window.location.origin);
   url.searchParams.set("user_input", params.user_input);
   if (params.max_steps) url.searchParams.set("max_steps", String(params.max_steps));
+  if (params.agent_id) url.searchParams.set("agent_id", String(params.agent_id));
   const res = await fetch(url.toString(), {
     method: "GET",
     headers: {

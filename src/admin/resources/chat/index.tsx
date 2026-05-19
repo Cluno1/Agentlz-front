@@ -17,7 +17,6 @@ import { IconUser, IconCopy, IconSearch } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
 import {
-  chainPdcStream,
   chatAgentStream,
   listAgentChatSessions,
 } from "../../data/api/agent";
@@ -77,7 +76,6 @@ const Chat: React.FC = () => {
   const [steps, setSteps] = useState<
     Array<{ step: string; detail?: Record<string, unknown> }>
   >([]);
-  const [chatMode, setChatMode] = useState<"chat" | "pdc">("chat");
   const [pdcEvents, setPdcEvents] = useState<PdcEventEnvelope[]>([]);
   /** 流式中止标记（用于用户点击“停止”） */
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
@@ -240,26 +238,18 @@ const Chat: React.FC = () => {
         });
       };
 
-      const gen =
-        chatMode === "pdc"
-          ? chainPdcStream(
-              { user_input: text, max_steps: 6 },
-              { signal: abortCtrlRef.current.signal },
-            )
-          : chatAgentStream(
-              {
-                agent_id: Number.isNaN(Number(agentId))
-                  ? undefined
-                  : Number(agentId),
-                type: (isContinue ? 1 : 0) as 0 | 1,
-                meta: { user_id: String(identity?.id ?? "") },
-                message: text,
-                ...(isContinue ? { record_id: recordId as number } : {}),
-              } as AgentChatInput,
-              {
-                signal: abortCtrlRef.current.signal,
-              },
-            );
+      const gen = chatAgentStream(
+        {
+          agent_id: Number.isNaN(Number(agentId)) ? undefined : Number(agentId),
+          type: (isContinue ? 1 : 0) as 0 | 1,
+          meta: { user_id: String(identity?.id ?? "") },
+          message: text,
+          ...(isContinue ? { record_id: recordId as number } : {}),
+        } as AgentChatInput,
+        {
+          signal: abortCtrlRef.current.signal,
+        },
+      );
 
       for await (const chunk of gen as AsyncGenerator<
         AgentChatStreamChunk & { record_id?: number },
@@ -653,22 +643,6 @@ const Chat: React.FC = () => {
                 alignItems: "stretch",
               }}
             >
-              <Button.Group>
-                <Button
-                  type={chatMode === "chat" ? "primary" : "secondary"}
-                  disabled={streaming}
-                  onClick={() => setChatMode("chat")}
-                >
-                  对话
-                </Button>
-                <Button
-                  type={chatMode === "pdc" ? "primary" : "secondary"}
-                  disabled={streaming}
-                  onClick={() => setChatMode("pdc")}
-                >
-                  执行
-                </Button>
-              </Button.Group>
               <Space>
                 <Button
                   type="primary"

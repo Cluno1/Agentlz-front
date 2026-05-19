@@ -1,28 +1,35 @@
-// SSE 事件 → 处理 注册表（通信改造方案 Step2）。
-// 行为与原 chat/index.tsx 内联 if/else 构造等价：仅把分发表驱动化，
-// 新增 agent 事件类型只需在 HANDLERS 加一条，不动消费循环；未命中走默认(text)，不丢帧。
+// SSE 事件 → 处理 注册表（Step2 + 前端展示方案）。
+// 细分：call.* → 正文工具 chip(onToolCall) + 右抽屉时间线(appendPdcEvent)；
+// final → 正文 md(appendAssistant) + 右抽屉；其余 PDC → 右抽屉；text → 普通文本流。
+// 加事件类型只需在 HANDLERS/classify 加一条，不动消费循环；未命中默认 text 不丢帧。
 import type { AgentChatStreamChunk, PdcEventEnvelope } from "../../data/api/agent/type";
 
 export type SseChunk = AgentChatStreamChunk & { record_id?: number };
 
 export interface SseCtx {
   appendPdcEvent: (e: PdcEventEnvelope) => void;
+  onToolCall: (e: PdcEventEnvelope) => void;
   appendAssistant: (s: string) => void;
   assistantTextFromPdcEvent: (e: PdcEventEnvelope) => string;
   onRecordId: (id: number) => void;
 }
 
-// 返回 true 表示应结束 for-await（等价原 `if (chunk.done) break;`）
 type Handler = (chunk: SseChunk, ctx: SseCtx) => boolean | void;
 
 const HANDLERS: Record<string, Handler> = {
-  // PDC 事件信封：等价原 `if (chunk.event) { appendPdcEvent; appendAssistant; continue; }`
-  pdc: (chunk, ctx) => {
+  tool: (chunk, ctx) => {
+    const ev = chunk.event as PdcEventEnvelope;
+    ctx.onToolCall(ev);
+    ctx.appendPdcEvent(ev);
+  },
+  final: (chunk, ctx) => {
     const ev = chunk.event as PdcEventEnvelope;
     ctx.appendPdcEvent(ev);
     ctx.appendAssistant(ctx.assistantTextFromPdcEvent(ev));
   },
-  // 普通聊天文本块：等价原 record_id + appendAssistant(delta||text) + done->break
+  pdc: (chunk, ctx) => {
+    ctx.appendPdcEvent(chunk.event as PdcEventEnvelope);
+  },
   text: (chunk, ctx) => {
     if (chunk?.record_id != null) ctx.onRecordId(Number(chunk.record_id));
     ctx.appendAssistant(chunk.delta || chunk.text || "");
@@ -30,8 +37,15 @@ const HANDLERS: Record<string, Handler> = {
   },
 };
 
-export function classifySseChunk(chunk: SseChunk): "pdc" | "text" {
-  return chunk && (chunk as { event?: unknown }).event ? "pdc" : "text";
+export function classifySseChunk(
+  chunk: SseChunk,
+): "tool" | "final" | "pdc" | "text" {
+  const ev = chunk && (chunk as { event?: PdcEventEnvelope }).event;
+  if (!ev) return "text";
+  const name = String(ev.evt || "");
+  if (name === "call.start" || name === "call.end") return "tool";
+  if (name === "final") return "final";
+  return "pdc";
 }
 
 export function dispatchSseChunk(chunk: SseChunk, ctx: SseCtx): boolean {

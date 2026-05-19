@@ -12,6 +12,7 @@ import {
   Spin,
   Tag,
   Empty,
+  Drawer,
 } from "@arco-design/web-react";
 import { IconUser, IconCopy, IconSearch } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
@@ -30,6 +31,8 @@ import { listAccessibleAgents } from "../../data/api/agent";
 import { useDarkMode } from "../../data/hook/useDark";
 import PdcTracePanel from "./components/PdcTracePanel";
 import { dispatchSseChunk } from "./sseRegistry";
+import ToolCallInline from "./components/ToolCallInline";
+import type { ToolCall } from "../../data/api/agent/type";
 type ApiAgentRow = {
   id?: number | string;
   agent_id?: number | string;
@@ -78,6 +81,8 @@ const Chat: React.FC = () => {
     Array<{ step: string; detail?: Record<string, unknown> }>
   >([]);
   const [pdcEvents, setPdcEvents] = useState<PdcEventEnvelope[]>([]);
+  const [pdcOpen, setPdcOpen] = useState(false);
+  const [toolCallsByMsg, setToolCallsByMsg] = useState<Record<string, ToolCall[]>>({});
   /** 流式中止标记（用于用户点击“停止”） */
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   /** 当前流式请求的 AbortController */
@@ -194,6 +199,16 @@ const Chat: React.FC = () => {
     }
   }, []);
 
+  const onToolCall = React.useCallback((event: PdcEventEnvelope) => {
+    const mid = assistantIdRef.current;
+    if (!mid) return;
+    const tc = (event.payload || {}) as ToolCall;
+    setToolCallsByMsg((prev) => ({
+      ...prev,
+      [mid]: [...(prev[mid] || []), tc],
+    }));
+  }, []);
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || !agentId || streaming) return;
@@ -260,6 +275,7 @@ const Chat: React.FC = () => {
         if (streamAbortRef.current.aborted) break;
         const _stop = dispatchSseChunk(chunk, {
           appendPdcEvent,
+          onToolCall,
           appendAssistant,
           assistantTextFromPdcEvent,
           onRecordId: (id: number) => {
@@ -780,6 +796,9 @@ const Chat: React.FC = () => {
                         lineHeight: 1.6,
                       }}
                     >
+                      {toolCallsByMsg[m.id]?.length ? (
+                        <ToolCallInline calls={toolCallsByMsg[m.id]} isDark={isDark} />
+                      ) : null}
                       <ReactMarkdown>{m.content}</ReactMarkdown>
                       {hoveredMsgId === m.id && (
                         <div
@@ -846,7 +865,11 @@ const Chat: React.FC = () => {
             )}
           </div>
           {pdcEvents.length > 0 && (
-            <PdcTracePanel events={pdcEvents} isDark={isDark} />
+            <div style={{ marginTop: 8 }}>
+              <Button size="small" type="outline" onClick={() => setPdcOpen(true)}>
+                PDC 执行链路 ({pdcEvents.length})
+              </Button>
+            </div>
           )}
           {steps.length > 0 && pdcEvents.length === 0 && (
             <div
@@ -884,6 +907,17 @@ const Chat: React.FC = () => {
         </div>
         {sendMessageComponent}
       </div>
+      <Drawer
+        title="PDC 执行链路"
+        visible={pdcOpen}
+        placement="right"
+        width={520}
+        footer={null}
+        onCancel={() => setPdcOpen(false)}
+        onOk={() => setPdcOpen(false)}
+      >
+        <PdcTracePanel events={pdcEvents} isDark={isDark} />
+      </Drawer>
       <HistoryDrawer
         visible={historyVisible}
         currentRecordId={recordId}

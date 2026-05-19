@@ -37,7 +37,7 @@ export const SystemManagement = () => {
   const tenantKey = import.meta.env.VITE_TENANT_ID as string;
   const tenantId = localStorage.getItem(tenantKey) || "default";
   const isAdmin = String(identity?.role || "") === "admin";
-  const canSystem = isAdmin && tenantId === "system";
+  const canSystem = isAdmin && (tenantId === "system" || tenantId === "default");
   const canTenant = isAdmin && tenantId !== "default" && tenantId !== "system";
   const initialScope = canSystem ? "system" : canTenant ? "tenant" : "tenant";
   const [scope, setScope] = useState<"system" | "tenant">(initialScope);

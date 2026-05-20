@@ -1,4 +1,9 @@
 export default {
+  ra: {
+    configurable: {
+      customize: "Customize this page",
+    },
+  },
   common: {
     loading: "Loading...",
     save: "Save",

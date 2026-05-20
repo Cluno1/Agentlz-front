@@ -31,7 +31,7 @@ class WSClient {
     const auth = this.getAuth();
     if (!auth.token) {
       this.setStatus("disconnected");
-      this.scheduleReconnect();
+      // 无 token 时不自动重连
       return;
     }
     this.connecting = true;

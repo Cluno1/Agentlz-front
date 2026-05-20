@@ -21,7 +21,6 @@ import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
 import { i18nProvider } from "./i18n/i18nProvider";
 import { ConfigProvider } from "@arco-design/web-react";
-import { useEffect } from "react";
 import { useTheme } from "@mui/material/styles";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
@@ -41,7 +40,6 @@ import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
 import Evaluation from "./resources/evaluation";
 import EvaluationDatasetUploadPage from "./resources/evaluation/component/EvaluationDatasetUploadPage";
-import { wsClient } from "./data/wsClient";
 import { ArcoLocaleBridge } from "./components/ArcoLocaleBridge";
 
 const BASENAME = (() => {
@@ -60,13 +58,6 @@ const darkTheme = {
 };
 
 export const App = () => {
-  useEffect(() => {
-    wsClient.connect();
-    return () => {
-      wsClient.disconnect();
-    };
-  }, []);
-
   return (
     <Admin
       layout={Layout}
@@ -97,8 +88,11 @@ export const App = () => {
       <Resource name="rag" list={<RagIndexPage />} show={<RagShow />} />
       <Resource name="mcp" show={<McpShow />} />
 
-      <CustomRoutes>
+      <CustomRoutes noLayout>
         <Route path="/register" element={<RegisterPage />} />
+      </CustomRoutes>
+
+      <CustomRoutes>
         <Route path="/rag/knowledge" element={<RagIndexPage />} />
         <Route path="/rag/evaluation" element={<RagIndexPage />} />
         <Route path="/rag/upload" element={<RagUploadPage />} />

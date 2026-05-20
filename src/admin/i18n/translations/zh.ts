@@ -1,4 +1,9 @@
 export default {
+  ra: {
+    configurable: {
+      customize: "自定义此页面",
+    },
+  },
   common: {
     loading: "加载中...",
     save: "保存",

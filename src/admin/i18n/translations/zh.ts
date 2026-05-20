@@ -1,4 +1,9 @@
 export default {
+  ra: {
+    configurable: {
+      customize: "自定义此页面",
+    },
+  },
   common: {
     loading: "加载中...",
     save: "保存",
@@ -10,6 +15,13 @@ export default {
     reload: "重新加载",
     yes: "是",
     no: "否",
+    websocket: {
+      disconnected: "WebSocket 已断链",
+      disconnectedMessage:
+        "WebSocket 正在尝试自动重连。如果长时间未连接，请点击下方按钮重试。",
+      reconnect: "立即重连",
+      connecting: "正在连接中...",
+    },
   },
   menu: {
     profile: "个人资料",

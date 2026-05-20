@@ -319,6 +319,28 @@ export async function* chatAgentStream(
   yield* readSseStream(res);
 }
 
+export async function* observationAgentStream(
+  payload: AgentChatInput,
+  opts?: { signal?: AbortSignal },
+): AsyncGenerator<AgentChatStreamChunk, void, unknown> {
+  const { base, token, tenantId } = getStreamAuth();
+  const res = await fetch(`${base}/agent/observation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal: opts?.signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("观测接口请求失败");
+  }
+  yield* readSseStream(res);
+}
+
 export async function* chainPdcStream(
   params: { user_input: string; max_steps?: number; agent_id?: number },
   opts?: { signal?: AbortSignal },

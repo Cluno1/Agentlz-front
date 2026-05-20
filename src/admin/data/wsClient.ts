@@ -7,6 +7,9 @@ type WSMessage = {
 
 type WSHandler = (msg: WSMessage) => void;
 
+type WSStatus = "connected" | "disconnected" | "connecting";
+type WSStatusHandler = (status: WSStatus) => void;
+
 class WSClient {
   private ws?: WebSocket;
   private connecting = false;
@@ -15,17 +18,24 @@ class WSClient {
   private retry = 0;
   private topicHandlers = new Map<string, Set<WSHandler>>();
   private allHandlers = new Set<WSHandler>();
+  private statusHandlers = new Set<WSStatusHandler>();
   private pendingTopics = new Set<string>();
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private heartbeatInterval = 10000;
+  private lastPong = 0;
+  private status: WSStatus = "disconnected";
 
   connect() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     if (this.connecting) return;
     const auth = this.getAuth();
     if (!auth.token) {
-      this.scheduleReconnect();
+      this.setStatus("disconnected");
+      // 无 token 时不自动重连
       return;
     }
     this.connecting = true;
+    this.setStatus("connecting");
     const url = this.getWsUrl();
     this.ws = new WebSocket(url);
     this.ws.onopen = () => {
@@ -33,10 +43,17 @@ class WSClient {
       this.retry = 0;
       this.sendAuth();
       this.flushPendingSubscriptions();
+      this.lastPong = Date.now();
+      this.startHeartbeat();
+      this.setStatus("connected");
     };
     this.ws.onmessage = (evt) => {
       const msg = this.safeParse(evt.data);
       if (!msg) return;
+      if (msg.type === "pong") {
+        this.lastPong = Date.now();
+        return;
+      }
       this.allHandlers.forEach((fn) => fn(msg));
       const topic = typeof msg.topic === "string" ? msg.topic : "";
       if (topic && this.topicHandlers.has(topic)) {
@@ -46,6 +63,8 @@ class WSClient {
     this.ws.onclose = () => {
       this.connecting = false;
       this.ws = undefined;
+      this.stopHeartbeat();
+      this.setStatus("disconnected");
       if (this.shouldReconnect) this.scheduleReconnect();
     };
     this.ws.onerror = () => {
@@ -62,6 +81,24 @@ class WSClient {
       this.ws.close();
       this.ws = undefined;
     }
+    this.stopHeartbeat();
+    this.setStatus("disconnected");
+  }
+
+  onStatus(handler: WSStatusHandler) {
+    this.statusHandlers.add(handler);
+    handler(this.status);
+    return () => this.statusHandlers.delete(handler);
+  }
+
+  getStatus() {
+    return this.status;
+  }
+
+  private setStatus(status: WSStatus) {
+    if (this.status === status) return;
+    this.status = status;
+    this.statusHandlers.forEach((fn) => fn(status));
   }
 
   subscribe(topic: string, handler: WSHandler) {
@@ -156,6 +193,25 @@ class WSClient {
     url.pathname = `${withV1}/ws`;
     url.search = "";
     return url.toString();
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.ws) return;
+      if (this.ws.readyState !== WebSocket.OPEN) return;
+      this.send({ type: "ping" });
+      const now = Date.now();
+      const tooOld = now - this.lastPong > this.heartbeatInterval * 3;
+      if (tooOld) {
+        this.ws.close();
+      }
+    }, this.heartbeatInterval);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
   }
 }
 

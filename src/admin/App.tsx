@@ -21,7 +21,6 @@ import ProfileEdit from "./resources/profile/ProfileEdit";
 import { dataProvider } from "./data/provider";
 import { i18nProvider } from "./i18n/i18nProvider";
 import { ConfigProvider } from "@arco-design/web-react";
-import { useEffect } from "react";
 import { useTheme } from "@mui/material/styles";
 import zhCN from "@arco-design/web-react/es/locale/zh-CN";
 import enUS from "@arco-design/web-react/es/locale/en-US";
@@ -41,7 +40,7 @@ import McpCreatePage from "./resources/mcp/McpCreatePage";
 import McpShow from "./resources/mcp/McpShow";
 import Evaluation from "./resources/evaluation";
 import EvaluationDatasetUploadPage from "./resources/evaluation/component/EvaluationDatasetUploadPage";
-import { wsClient } from "./data/wsClient";
+import { ArcoLocaleBridge } from "./components/ArcoLocaleBridge";
 
 const BASENAME = (() => {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -53,41 +52,12 @@ const BASENAME = (() => {
   return b === "/" ? undefined : b;
 })();
 
-const ArcoLocaleBridge = ({ children }: { children: React.ReactNode }) => {
-  const locale = useLocale();
-  const arcoLocale = locale === "en" ? enUS : zhCN;
-  const muiTheme = useTheme();
-  useEffect(() => {
-    const body = document.body;
-    const isDark = muiTheme.palette.mode === "dark";
-    if (isDark) {
-      body.setAttribute("arco-theme", "dark");
-      body.style.setProperty("background-color", "var(--color-bg-1)");
-      body.style.setProperty("color", "var(--color-text-1)");
-      body.style.setProperty("color-scheme", "dark");
-    } else {
-      body.removeAttribute("arco-theme");
-      body.style.removeProperty("background-color");
-      body.style.removeProperty("color");
-      body.style.setProperty("color-scheme", "light");
-    }
-  }, [muiTheme.palette.mode]);
-  return <ConfigProvider locale={arcoLocale}>{children}</ConfigProvider>;
-};
-
 const darkTheme = {
   ...defaultTheme,
   palette: { mode: "dark" },
 };
 
 export const App = () => {
-  useEffect(() => {
-    wsClient.connect();
-    return () => {
-      wsClient.disconnect();
-    };
-  }, []);
-
   return (
     <Admin
       layout={Layout}
@@ -101,185 +71,41 @@ export const App = () => {
     >
       <Resource
         name="user-management"
-        list={
-          <ArcoLocaleBridge>
-            <UserManagement />
-          </ArcoLocaleBridge>
-        }
+        list={<UserManagement />}
         create={<UserCreate />}
         edit={<UserEdit />}
       />
-      <Resource
-        name="system-management"
-        list={
-          <ArcoLocaleBridge>
-            <SystemManagement />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="tenant-management"
-        list={
-          <ArcoLocaleBridge>
-            <TenantManagement />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="profile"
-        list={
-          <ArcoLocaleBridge>
-            <ProfilePage />
-          </ArcoLocaleBridge>
-        }
-        edit={<ProfileEdit />}
-      />
-      <Resource
-        name="create"
-        list={
-          <ArcoLocaleBridge>
-            <CreatePage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="chat"
-        list={
-          <ArcoLocaleBridge>
-            <Chat />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="agent"
-        list={
-          <ArcoLocaleBridge>
-            <Agent />
-          </ArcoLocaleBridge>
-        }
-      />
+      <Resource name="system-management" list={<SystemManagement />} />
+      <Resource name="tenant-management" list={<TenantManagement />} />
+      <Resource name="profile" list={<ProfilePage />} edit={<ProfileEdit />} />
+      <Resource name="create" list={<CreatePage />} />
+      <Resource name="chat" list={<Chat />} />
+      <Resource name="agent" list={<Agent />} />
 
-      <Resource
-        name="evaluation"
-        list={
-          <ArcoLocaleBridge>
-            <Evaluation />
-          </ArcoLocaleBridge>
-        }
-      />
+      <Resource name="evaluation" list={<Evaluation />} />
 
-      <Resource
-        name="mcp-tools"
-        list={
-          <ArcoLocaleBridge>
-            <McpToolsPage />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="rag"
-        list={
-          <ArcoLocaleBridge>
-            <RagIndexPage />
-          </ArcoLocaleBridge>
-        }
-        show={
-          <ArcoLocaleBridge>
-            <RagShow />
-          </ArcoLocaleBridge>
-        }
-      />
-      <Resource
-        name="mcp"
-        show={
-          <ArcoLocaleBridge>
-            <McpShow />
-          </ArcoLocaleBridge>
-        }
-      />
+      <Resource name="mcp-tools" list={<McpToolsPage />} />
+      <Resource name="rag" list={<RagIndexPage />} show={<RagShow />} />
+      <Resource name="mcp" show={<McpShow />} />
+
+      <CustomRoutes noLayout>
+        <Route path="/register" element={<RegisterPage />} />
+      </CustomRoutes>
 
       <CustomRoutes>
-        <Route path="/register" element={<RegisterPage />} />
-        <Route
-          path="/rag/knowledge"
-          element={
-            <ArcoLocaleBridge>
-              <RagIndexPage />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/evaluation"
-          element={
-            <ArcoLocaleBridge>
-              <RagIndexPage />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/upload"
-          element={
-            <ArcoLocaleBridge>
-              <RagUploadPage />
-            </ArcoLocaleBridge>
-          }
-        />
+        <Route path="/rag/knowledge" element={<RagIndexPage />} />
+        <Route path="/rag/evaluation" element={<RagIndexPage />} />
+        <Route path="/rag/upload" element={<RagUploadPage />} />
         <Route
           path="/evaluation/datasets/upload"
-          element={
-            <ArcoLocaleBridge>
-              <EvaluationDatasetUploadPage />
-            </ArcoLocaleBridge>
-          }
+          element={<EvaluationDatasetUploadPage />}
         />
-        <Route
-          path="/agent/create"
-          element={
-            <ArcoLocaleBridge>
-              <CreateAgent />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/mcp/create"
-          element={
-            <ArcoLocaleBridge>
-              <McpCreatePage />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/:id/chunks"
-          element={
-            <ArcoLocaleBridge>
-              <ChunkPage />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/:id/chunks/:strategy"
-          element={
-            <ArcoLocaleBridge>
-              <ChunkShow />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/strategy/all"
-          element={
-            <ArcoLocaleBridge>
-              <RagStrategyAllPage />
-            </ArcoLocaleBridge>
-          }
-        />
-        <Route
-          path="/rag/strategy/:strategyId"
-          element={
-            <ArcoLocaleBridge>
-              <RagStrategyPage />
-            </ArcoLocaleBridge>
-          }
-        />
+        <Route path="/agent/create" element={<CreateAgent />} />
+        <Route path="/mcp/create" element={<McpCreatePage />} />
+        <Route path="/rag/:id/chunks" element={<ChunkPage />} />
+        <Route path="/rag/:id/chunks/:strategy" element={<ChunkShow />} />
+        <Route path="/rag/strategy/all" element={<RagStrategyAllPage />} />
+        <Route path="/rag/strategy/:strategyId" element={<RagStrategyPage />} />
       </CustomRoutes>
     </Admin>
   );

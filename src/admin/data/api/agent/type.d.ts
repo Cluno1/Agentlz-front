@@ -166,6 +166,18 @@ export interface ToolCall {
   [k: string]: any;
 }
 
+export interface ArtifactFile {
+  url: string;
+  filename?: string;
+  artifact_type?: string;
+  content_type?: string;
+  size?: number | string | null;
+  cos_key?: string;
+  request_id?: string;
+  markdown?: string;
+  [k: string]: any;
+}
+
 export interface ToolAssessment {
   mcp_id?: string;
   server?: string;

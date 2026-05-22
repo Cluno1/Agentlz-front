@@ -244,10 +244,11 @@ export default {
     },
   },
   mcpTools: {
-    title: "MCP Tools",
+    title: "MCP Tool Catalog",
     placeholder: "This is a placeholder content for MCP Tools page.",
     ui: {
-      subtitle: "Global platform listing 30,000+ MCP Servers",
+      subtitle:
+        "Enterprise MCP tool catalog for search, files, generation, notifications, and workflow automation.",
       searchPlaceholder: "Search by name",
       categories: {
         all: "All",
@@ -257,7 +258,7 @@ export default {
         other: "Other",
       },
       stats: {
-        total: "Listed",
+        total: "Current tools",
         today: "Added today",
       },
       install: "Copy install command",

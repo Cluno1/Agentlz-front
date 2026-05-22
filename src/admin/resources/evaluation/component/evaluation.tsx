@@ -30,6 +30,9 @@ import {
 import type { EvaluationNameSpace } from "../../../data/api/evaluation/type";
 import { wsClient } from "../../../data/wsClient";
 import type { WSMessage } from "../../../data/wsClient";
+import ToolCallInline from "../../chat/components/ToolCallInline";
+import type { ToolCall } from "../../../data/api/agent/type";
+import { useDarkMode } from "../../../data/hook/useDark";
 
 type ApiAgentRow = {
   id?: number | string;
@@ -48,6 +51,7 @@ type EvalRow = {
   fact_output?: string;
   score?: number;
   opinion?: string;
+  tool_calls?: ToolCall[];
 };
 
 const Evaluation: React.FC = () => {
@@ -84,6 +88,8 @@ const Evaluation: React.FC = () => {
   >(undefined);
   const [contentPreview, setContentPreview] = useState<string>("");
   const [contentPreviewVisible, setContentPreviewVisible] = useState(false);
+  const [detailRow, setDetailRow] = useState<EvalRow | null>(null);
+  const isDark = useDarkMode();
 
   const fetchAgents = React.useCallback(async () => {
     try {
@@ -155,6 +161,9 @@ const Evaluation: React.FC = () => {
           fact_output: item.fact_output,
           score: item.score,
           opinion: item.opinion,
+          tool_calls: Array.isArray((item as { tool_calls?: ToolCall[] }).tool_calls)
+            ? ((item as { tool_calls?: ToolCall[] }).tool_calls as ToolCall[])
+            : [],
         });
         return next;
       });
@@ -281,20 +290,36 @@ const Evaluation: React.FC = () => {
     return `${done}/${total}`;
   }, [rows.length, datasets, selectedDatasetId]);
 
+  const surfaceStyle: React.CSSProperties = {
+    border: "1px solid #E5E6EB",
+    borderRadius: 8,
+    background: "#FFFFFF",
+    boxShadow: "0 10px 28px rgba(29, 33, 41, 0.06)",
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", rowGap: 16 }}>
-      <Card>
+      <Card style={surfaceStyle}>
+        <div style={{ marginBottom: 16 }}>
+          <Typography.Title heading={6} style={{ margin: 0 }}>
+            批量评测任务
+          </Typography.Title>
+          <Typography.Text style={{ color: "#4E5969" }}>
+            选择助手和测试集后启动评测，用统一数据集验证输出质量和稳定性。
+          </Typography.Text>
+        </div>
         <div
           style={{
             marginBottom: 12,
-            display: "flex",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 12,
             alignItems: "center",
-            justifyContent: "space-between",
           }}
         >
-          <Space>
+          <Space wrap>
             <Select
-              style={{ width: 320 }}
+              style={{ minWidth: 220 }}
               value={agentId}
               onChange={setAgentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
@@ -321,9 +346,9 @@ const Evaluation: React.FC = () => {
             </Button>
           </Space>
         </div>
-        <Space wrap style={{ marginBottom: 12 }}>
+        <Space wrap style={{ marginBottom: 12, width: "100%" }}>
           <Select
-            style={{ width: 140 }}
+            style={{ width: 150 }}
             value={datasetType}
             onChange={(v) => {
               setDatasetType(v as "self" | "tenant" | "system");
@@ -414,12 +439,14 @@ const Evaluation: React.FC = () => {
         />
       </Card>
 
-      <Card>
+      <Card style={surfaceStyle}>
         <div
           style={{
             marginBottom: 12,
             display: "flex",
             justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <Typography.Text>
@@ -472,8 +499,59 @@ const Evaluation: React.FC = () => {
             },
           ]}
           data={rows}
+          onRow={(record) => ({
+            onClick: () => setDetailRow(record as EvalRow),
+            style: { cursor: "pointer" },
+          })}
         />
       </Card>
+
+      <Modal
+        title={t("evaluation.ui.detail", { _: "评测详情" })}
+        visible={!!detailRow}
+        onCancel={() => setDetailRow(null)}
+        onOk={() => setDetailRow(null)}
+        style={{ width: "min(960px, 90vw)" }}
+      >
+        {detailRow ? (
+          <div style={{ maxHeight: "70vh", overflow: "auto", fontSize: 13, lineHeight: 1.6 }}>
+            <div style={{ marginBottom: 8 }}>
+              <b>ID：</b>{detailRow.id}
+              {typeof detailRow.score === "number" ? (
+                <Tag style={{ marginLeft: 8 }}>score: {detailRow.score}</Tag>
+              ) : null}
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <b>instruction：</b>
+              <div style={{ whiteSpace: "pre-wrap" }}>{detailRow.instruction || "-"}</div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <b>input：</b>
+              <div style={{ whiteSpace: "pre-wrap" }}>{detailRow.input || "-"}</div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <b>期望 output：</b>
+              <div style={{ whiteSpace: "pre-wrap" }}>{detailRow.output || "-"}</div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <b>实际 fact_output：</b>
+              <div style={{ whiteSpace: "pre-wrap" }}>{detailRow.fact_output || "-"}</div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <b>opinion：</b>
+              <div style={{ whiteSpace: "pre-wrap" }}>{detailRow.opinion || "-"}</div>
+            </div>
+            {Array.isArray(detailRow.tool_calls) && detailRow.tool_calls.length > 0 ? (
+              <div style={{ marginTop: 12 }}>
+                <b>工具调用：</b>
+                <ToolCallInline calls={detailRow.tool_calls} isDark={isDark} />
+              </div>
+            ) : (
+              <div style={{ marginTop: 12, color: "#86909C" }}>本条无工具调用记录</div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         title={t("evaluation.ui.history", { _: "历史测评结果" })}

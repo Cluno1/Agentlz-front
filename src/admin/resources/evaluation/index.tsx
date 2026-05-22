@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Title, useTranslate } from "react-admin";
+import { useTranslate } from "react-admin";
 import {
   Card,
   Button,
@@ -11,6 +11,7 @@ import {
   Form,
   Radio,
   Spin,
+  Typography,
 } from "@arco-design/web-react";
 import { IconSearch } from "@arco-design/web-react/icon";
 import Observation from "./component/observation";
@@ -52,9 +53,20 @@ const EvaluationIndex: React.FC = () => {
   const [agentId, setAgentId] = useState<string>("");
   const [agentQuery, setAgentQuery] = useState<string>("");
   const [selectOpen, setSelectOpen] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
   const isDefaultTenant =
     (localStorage.getItem(import.meta.env.VITE_TENANT_ID) || "default") ===
     "default";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      setIsNarrow(window.innerWidth < 1080);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -168,6 +180,9 @@ const EvaluationIndex: React.FC = () => {
           const cb = metaObj["chatopenai_base_url"];
           if (typeof cb === "string")
             form.setFieldsValue({ chatopenai_base_url: cb });
+          const cm = metaObj["model_name"];
+          if (typeof cm === "string")
+            form.setFieldsValue({ chatopenai_model: cm });
         }
       } catch {
         void 0;
@@ -201,6 +216,11 @@ const EvaluationIndex: React.FC = () => {
       : t("agent.ui.modelDefault", { _: "系统默认" });
   }, [selectedModelId, modelItems, t, modelSource]);
 
+  const currentAgent = useMemo(
+    () => agents.find((agent) => String(agent.id) === agentId),
+    [agents, agentId],
+  );
+
   const toggleSelectMcp = (id?: number) => {
     if (typeof id !== "number") return;
     setSelectedMcpIds((prev) => {
@@ -209,24 +229,149 @@ const EvaluationIndex: React.FC = () => {
       return [...prev, id];
     });
   };
+
+  const surfaceStyle: React.CSSProperties = {
+    border: "1px solid #E5E6EB",
+    borderRadius: 8,
+    background: "#FFFFFF",
+    boxShadow: "0 10px 28px rgba(29, 33, 41, 0.06)",
+  };
+
+  const mutedTextStyle: React.CSSProperties = {
+    color: "#4E5969",
+    lineHeight: 1.7,
+  };
+
+  const configCardStyle = (
+    key: "base" | "rag" | "mcp" | "model",
+    accent: string,
+  ): React.CSSProperties => ({
+    ...surfaceStyle,
+    borderTop: `4px solid ${accent}`,
+    borderColor: rightActive === key ? accent : "#E5E6EB",
+    cursor: "pointer",
+  });
+
+  const activeLabel =
+    active === "observation"
+      ? t("evaluation.tabs.observe", { _: "观测" })
+      : t("evaluation.tabs.evaluate", { _: "评测" });
+
   return (
-    <div style={{ paddingTop: "30px" }}>
-      <Card
-        title={<Title title={t("evaluation.title", { _: "智能体评测" })} />}
-        bordered
-      >
+    <div style={{ minHeight: "100%", background: "#F7F8FA" }}>
+      <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 12,
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 8,
+            padding: "34px 32px",
+            color: "#FFFFFF",
+            background:
+              "linear-gradient(135deg, #111827 0%, #1B365D 42%, #0B7A75 100%)",
+            boxShadow: "0 18px 45px rgba(17, 24, 39, 0.18)",
           }}
         >
-          <Space>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 24,
+              alignItems: "center",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <div>
+              <Tag color="arcoblue" style={{ marginBottom: 16 }}>
+                AGENT EVALUATION CENTER
+              </Tag>
+              <Typography.Title
+                heading={3}
+                style={{ color: "#FFFFFF", margin: 0 }}
+              >
+                {t("evaluation.title", { _: "智能体评测" })}
+              </Typography.Title>
+              <Typography.Paragraph
+                style={{
+                  color: "rgba(255,255,255,0.82)",
+                  maxWidth: 760,
+                  marginTop: 14,
+                  marginBottom: 0,
+                  lineHeight: 1.8,
+                }}
+              >
+                面向企业试运行的 Agent 质量工作台。通过实时观测和批量评测，
+                统一验证回答质量、知识引用、工具调用和历史续聊稳定性。
+              </Typography.Paragraph>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 12,
+              }}
+            >
+              {[
+                [activeLabel, "当前模式"],
+                [agents.length ? String(agents.length) : "-", "可访问助手"],
+                [selectedDocsText, "知识资料"],
+                [String(selectedMcpIds.length), "MCP 工具"],
+              ].map(([value, label]) => (
+                <div
+                  key={`${value}-${label}`}
+                  style={{
+                    minHeight: 92,
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.10)",
+                    padding: 16,
+                    backdropFilter: "blur(6px)",
+                  }}
+                >
+                  <Typography.Title
+                    heading={5}
+                    style={{
+                      color: "#FFFFFF",
+                      margin: 0,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {value}
+                  </Typography.Title>
+                  <Typography.Text style={{ color: "rgba(255,255,255,0.74)" }}>
+                    {label}
+                  </Typography.Text>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 6,
+              background:
+                "linear-gradient(90deg, #165DFF 0%, #00B42A 33%, #F7BA1E 66%, #722ED1 100%)",
+            }}
+          />
+        </div>
+
+        <div style={{ ...surfaceStyle, padding: 20 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 12,
+              alignItems: "center",
+              marginBottom: currentAgent ? 16 : 0,
+            }}
+          >
             <Input
               allowClear
-              style={{ width: 280 }}
+              prefix={<IconSearch />}
               placeholder={t("agent.ui.searchPlaceholder", {
                 _: "按名称/描述搜索",
               })}
@@ -234,18 +379,7 @@ const EvaluationIndex: React.FC = () => {
               onChange={setAgentQuery}
               onPressEnter={() => setAgentQuery(agentQuery)}
             />
-            <Button
-              type="primary"
-              icon={<IconSearch />}
-              onClick={() => setAgentQuery(agentQuery)}
-              loading={agentsLoading}
-            >
-              {t("agent.ui.search", { _: "搜索" })}
-            </Button>
-          </Space>
-          <Space>
             <Select
-              style={{ width: 320 }}
               value={agentId}
               onChange={setAgentId}
               placeholder={t("agent.ui.selectAgent", { _: "选择助手" })}
@@ -270,89 +404,120 @@ const EvaluationIndex: React.FC = () => {
                 </Select.Option>
               ))}
             </Select>
-            {agentsLoading && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Spin size={16} />
-                <span>搜索中</span>
-              </div>
-            )}
-          </Space>
-        </div>
-        {agentId && (
-          <Card style={{ marginBottom: 12 }}>
-            {(() => {
-              const currentAgent = agents.find((x) => String(x.id) === agentId);
-              if (!currentAgent) return null;
-              return (
+            <Space wrap>
+              <Button
+                type="primary"
+                icon={<IconSearch />}
+                onClick={() => setAgentQuery(agentQuery)}
+                loading={agentsLoading}
+              >
+                {t("agent.ui.search", { _: "搜索" })}
+              </Button>
+              {agentsLoading && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Avatar size={28} style={{ backgroundColor: "#f6f7fb" }}>
-                    {currentAgent.avatar ? (
-                      <img
-                        src={currentAgent.avatar || ""}
-                        alt={currentAgent.name || ""}
-                      />
-                    ) : (
-                      (currentAgent.name || "A").slice(0, 1)
-                    )}
-                  </Avatar>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500 }}>
-                      {currentAgent.name || "-"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
-                      {currentAgent.description || ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {(currentAgent.tags || []).map((tag: string) => (
-                      <Tag key={tag} size="small" color="arcoblue">
-                        {tag}
-                      </Tag>
-                    ))}
-                  </div>
+                  <Spin size={16} />
+                  <span>搜索中</span>
                 </div>
-              );
-            })()}
-          </Card>
-        )}
+              )}
+            </Space>
+          </div>
+
+          {currentAgent && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "48px minmax(0, 1fr)",
+                gap: 12,
+                alignItems: "center",
+                padding: 16,
+                borderRadius: 8,
+                background: "#F7F8FA",
+              }}
+            >
+              <Avatar
+                size={42}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #165DFF 0%, #00B42A 100%)",
+                }}
+              >
+                {currentAgent.avatar ? (
+                  <img
+                    src={currentAgent.avatar || ""}
+                    alt={currentAgent.name || ""}
+                  />
+                ) : (
+                  (currentAgent.name || "A").slice(0, 1)
+                )}
+              </Avatar>
+              <div style={{ minWidth: 0 }}>
+                <Typography.Text style={{ fontWeight: 600 }}>
+                  {currentAgent.name || "-"}
+                </Typography.Text>
+                <Typography.Paragraph
+                  style={{ ...mutedTextStyle, marginBottom: 8 }}
+                >
+                  {currentAgent.description || "当前助手暂无描述"}
+                </Typography.Paragraph>
+                <Space wrap size={6}>
+                  {(currentAgent.tags || []).map((tag: string) => (
+                    <Tag key={tag} size="small" color="arcoblue">
+                      {tag}
+                    </Tag>
+                  ))}
+                </Space>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div
           style={{
+            ...surfaceStyle,
+            padding: 16,
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: 12,
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
-          <Space>
-            <Button.Group>
-              <Button
-                type={active === "observation" ? "primary" : "outline"}
-                onClick={() => setActive("observation")}
-              >
-                {t("evaluation.tabs.observe", { _: "观测" })}
-              </Button>
-              <Button
-                type={active === "evaluation" ? "primary" : "outline"}
-                onClick={() => setActive("evaluation")}
-              >
-                {t("evaluation.tabs.evaluate", { _: "评测" })}
-              </Button>
-            </Button.Group>
-          </Space>
-          <Space>
-            <Button onClick={() => setSidebarCollapsed((c) => !c)}>
-              {sidebarCollapsed
-                ? t("agent.ui.expand", { _: "展开左侧" })
-                : t("agent.ui.collapse", { _: "收起左侧" })}
+          <Button.Group>
+            <Button
+              type={active === "observation" ? "primary" : "outline"}
+              onClick={() => setActive("observation")}
+            >
+              {t("evaluation.tabs.observe", { _: "观测" })}
             </Button>
-          </Space>
+            <Button
+              type={active === "evaluation" ? "primary" : "outline"}
+              onClick={() => setActive("evaluation")}
+            >
+              {t("evaluation.tabs.evaluate", { _: "评测" })}
+            </Button>
+          </Button.Group>
+          <Button onClick={() => setSidebarCollapsed((c) => !c)}>
+            {sidebarCollapsed
+              ? t("agent.ui.expand", { _: "展开配置" })
+              : t("agent.ui.collapse", { _: "收起配置" })}
+          </Button>
         </div>
 
-        <div style={{ display: "flex", gap: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              sidebarCollapsed || isNarrow
+                ? "minmax(0, 1fr)"
+                : "360px minmax(0, 1fr)",
+            gap: 16,
+            alignItems: "start",
+          }}
+        >
           {!sidebarCollapsed && (
             <div
               style={{
-                width: 360,
+                width: "100%",
                 display: "flex",
                 flexDirection: "column",
                 rowGap: 12,
@@ -361,9 +526,7 @@ const EvaluationIndex: React.FC = () => {
               <Card
                 hoverable
                 onClick={() => setRightActive("base")}
-                style={{
-                  borderColor: rightActive === "base" ? "#165DFF" : undefined,
-                }}
+                style={configCardStyle("base", "#165DFF")}
               >
                 <Form form={form} layout="vertical">
                   <Form.Item
@@ -406,9 +569,7 @@ const EvaluationIndex: React.FC = () => {
               <Card
                 hoverable
                 onClick={() => setRightActive("model")}
-                style={{
-                  borderColor: rightActive === "model" ? "#165DFF" : undefined,
-                }}
+                style={configCardStyle("model", "#722ED1")}
               >
                 <div
                   style={{
@@ -506,6 +667,22 @@ const EvaluationIndex: React.FC = () => {
                           )}
                         />
                       </Form.Item>
+                      <Form.Item
+                        label={t("agent.ui.chatopenaiModel", {
+                          _: "模型名称",
+                        })}
+                        field="chatopenai_model"
+                      >
+                        <Input
+                          allowClear
+                          placeholder={t(
+                            "agent.ui.chatopenaiModelPlaceholder",
+                            {
+                              _: "需与上游 API 一致，例如 deepseek-chat、DeepSeek-V3.2",
+                            },
+                          )}
+                        />
+                      </Form.Item>
                     </>
                   )}
                 </Form>
@@ -513,9 +690,7 @@ const EvaluationIndex: React.FC = () => {
               <Card
                 hoverable
                 onClick={() => setRightActive("rag")}
-                style={{
-                  borderColor: rightActive === "rag" ? "#165DFF" : undefined,
-                }}
+                style={configCardStyle("rag", "#00B42A")}
               >
                 <div
                   style={{
@@ -534,9 +709,7 @@ const EvaluationIndex: React.FC = () => {
               <Card
                 hoverable
                 onClick={() => setRightActive("mcp")}
-                style={{
-                  borderColor: rightActive === "mcp" ? "#165DFF" : undefined,
-                }}
+                style={configCardStyle("mcp", "#F7BA1E")}
               >
                 <div
                   style={{
@@ -552,7 +725,7 @@ const EvaluationIndex: React.FC = () => {
                   </Tag>
                 </div>
               </Card>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <Space />
                 <Space>
                   <Button
@@ -580,6 +753,8 @@ const EvaluationIndex: React.FC = () => {
                           if (values.chatopenai_base_url)
                             meta.chatopenai_base_url =
                               values.chatopenai_base_url;
+                          if (values.chatopenai_model)
+                            meta.model_name = values.chatopenai_model;
                         }
                         const payload: UpdateAgentNameSpace.UpdateAgentParams =
                           {
@@ -625,7 +800,14 @@ const EvaluationIndex: React.FC = () => {
               </div>
             </div>
           )}
-          <div style={{ flex: 1 }}>
+          <div
+            style={{
+              ...surfaceStyle,
+              minWidth: 0,
+              padding: 16,
+              overflowX: "auto",
+            }}
+          >
             {active === "observation" && (
               <Observation
                 active={rightActive}
@@ -647,7 +829,7 @@ const EvaluationIndex: React.FC = () => {
             {active === "evaluation" && <Evaluation />}
           </div>
         </div>
-      </Card>
+      </Space>
     </div>
   );
 };

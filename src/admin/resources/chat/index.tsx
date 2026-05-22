@@ -14,7 +14,7 @@ import {
   Empty,
   Drawer,
 } from "@arco-design/web-react";
-import { IconUser, IconCopy, IconSearch } from "@arco-design/web-react/icon";
+import { IconUser, IconCopy, IconSearch, IconDownload } from "@arco-design/web-react/icon";
 import { useTranslate, useGetIdentity } from "react-admin";
 import { type AgentInfo, type ChatMessage } from "../../data/agent";
 import {
@@ -23,7 +23,9 @@ import {
 } from "../../data/api/agent";
 import type {
   AgentChatInput,
+  AgentChatRecord,
   AgentChatStreamChunk,
+  ArtifactFile,
   PdcEventEnvelope,
 } from "../../data/api/agent/type";
 import HistoryDrawer from "./components/HistoryDrawer";
@@ -54,8 +56,194 @@ function pdcPayloadToText(value: unknown): string {
 
 function assistantTextFromPdcEvent(event: PdcEventEnvelope): string {
   if (event.evt !== "final") return "";
+  const payload = event.payload;
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const value = (payload as Record<string, unknown>).text ??
+      (payload as Record<string, unknown>).content ??
+      (payload as Record<string, unknown>).message;
+    if (value != null) return pdcPayloadToText(value);
+  }
   return pdcPayloadToText(event.payload);
 }
+
+function tryParseArtifactJsonText(text: string): unknown[] {
+  const values: unknown[] = [];
+  const pushJson = (candidate: string) => {
+    const raw = candidate.trim();
+    if (!raw) return;
+    const variants = [
+      raw,
+      raw
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t")
+        .replace(/\\"/g, '"')
+        .replace(/\\'/g, "'"),
+    ];
+    for (const item of variants) {
+      try {
+        values.push(JSON.parse(item));
+        return;
+      } catch {
+        // continue
+      }
+    }
+  };
+  pushJson(text);
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    pushJson(text.slice(start, end + 1));
+  }
+  const contentPattern = /content=(['"])([\s\S]*?)\1(?:\s+\w+=|$)/g;
+  for (const match of text.matchAll(contentPattern)) {
+    pushJson(match[2] || "");
+  }
+  return values;
+}
+
+function artifactNameFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const name = decodeURIComponent(pathname.split("/").filter(Boolean).pop() || "");
+    return name || "文件";
+  } catch {
+    return "文件";
+  }
+}
+
+const ARTIFACT_EXTS = new Set([
+  "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "md", "rtf",
+  "odt", "odp", "ods",
+  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff", "heic",
+  "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz",
+  "mp3", "mp4", "mov", "avi", "wav", "flac", "ogg", "webm", "m4a", "mkv",
+  "json", "xml", "yaml", "yml",
+]);
+
+function isLikelyArtifactUrl(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const last = pathname.split("/").filter(Boolean).pop() || "";
+    const dot = last.lastIndexOf(".");
+    if (dot < 0) return false;
+    return ARTIFACT_EXTS.has(last.slice(dot + 1));
+  } catch {
+    return false;
+  }
+}
+
+function normalizeArtifactPayload(payload: unknown): ArtifactFile[] {
+  const found: ArtifactFile[] = [];
+  const visit = (value: unknown) => {
+    if (!value) return;
+    if (typeof value === "string") {
+      for (const parsed of tryParseArtifactJsonText(value)) visit(parsed);
+      const markdownPattern = /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g;
+      for (const match of value.matchAll(markdownPattern)) {
+        const label = match[0].split("]", 1)[0].replace("[", "").replace(/^下载\s*/, "").trim();
+        found.push({
+          url: match[1],
+          filename: label || artifactNameFromUrl(match[1]),
+        });
+      }
+      const urlPattern = /https?:\/\/[^\s)'"]+/g;
+      for (const match of value.matchAll(urlPattern)) {
+        const url = match[0].replace(/[，。,.;]+$/, "");
+        found.push({
+          url,
+          filename: artifactNameFromUrl(url),
+        });
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== "object") return;
+    const item = value as Record<string, unknown>;
+    const url = String(item.url || "");
+    if (/^https?:\/\//.test(url)) {
+      found.push({
+        ...item,
+        url,
+        filename: String(item.filename || "文件"),
+        artifact_type: item.artifact_type ? String(item.artifact_type) : undefined,
+        content_type: item.content_type ? String(item.content_type) : undefined,
+        size: (item.size as ArtifactFile["size"]) ?? null,
+        cos_key: item.cos_key ? String(item.cos_key) : undefined,
+        request_id: item.request_id ? String(item.request_id) : undefined,
+        markdown: item.markdown ? String(item.markdown) : undefined,
+      });
+    }
+    visit(item.artifact);
+    visit(item.artifacts);
+    visit(item.files);
+  };
+  visit(payload);
+  const seen = new Set<string>();
+  return found.filter((item) => {
+    if (seen.has(item.url)) return false;
+    if (!isLikelyArtifactUrl(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
+}
+
+function appendArtifactsForMessage(
+  setArtifactsByMsg: React.Dispatch<React.SetStateAction<Record<string, ArtifactFile[]>>>,
+  messageId: string,
+  artifacts: ArtifactFile[],
+) {
+  if (!messageId || !artifacts.length) return;
+  setArtifactsByMsg((prev) => {
+    const existing = prev[messageId] || [];
+    const seen = new Set(existing.map((item) => item.url));
+    const nextItems = artifacts.filter((item) => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+    if (!nextItems.length) return prev;
+    return {
+      ...prev,
+      [messageId]: [...existing, ...nextItems],
+    };
+  });
+}
+
+function artifactLabel(item: ArtifactFile): string {
+  const type = String(item.artifact_type || "").toUpperCase();
+  const name = item.filename || "文件";
+  return type ? `下载 ${type}` : `下载 ${name}`;
+}
+
+const ArtifactDownloads: React.FC<{ artifacts: ArtifactFile[]; isDark?: boolean }> = ({
+  artifacts,
+  isDark,
+}) => {
+  if (!artifacts.length) return null;
+  const borderColor = isDark ? "rgba(96, 165, 250, 0.28)" : "rgba(59, 130, 246, 0.16)";
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0", borderColor }}>
+      {artifacts.map((item) => (
+        <a
+          key={`${item.url}-${item.filename || ""}`}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={item.filename || item.url}
+          style={{ textDecoration: "none" }}
+        >
+          <Button type="primary" size="small" icon={<IconDownload />} style={{ borderRadius: 6 }}>
+            {artifactLabel(item)}
+          </Button>
+        </a>
+      ))}
+    </div>
+  );
+};
 
 const Chat: React.FC = () => {
   const t = useTranslate();
@@ -83,6 +271,7 @@ const Chat: React.FC = () => {
   const [pdcEvents, setPdcEvents] = useState<PdcEventEnvelope[]>([]);
   const [pdcOpen, setPdcOpen] = useState(false);
   const [toolCallsByMsg, setToolCallsByMsg] = useState<Record<string, ToolCall[]>>({});
+  const [artifactsByMsg, setArtifactsByMsg] = useState<Record<string, ArtifactFile[]>>({});
   /** 流式中止标记（用于用户点击“停止”） */
   const streamAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   /** 当前流式请求的 AbortController */
@@ -109,10 +298,14 @@ const Chat: React.FC = () => {
   const [sessionsTotal, setSessionsTotal] = useState(0);
   /** 已加载的会话条数（用于滚动加载判断） */
   const [sessionsLoadedCount, setSessionsLoadedCount] = useState(0);
+  /** 历史会话强制重载标记（支持点击当前 record 重新加载） */
+  const [sessionsReloadKey, setSessionsReloadKey] = useState(0);
   /** 上一次更新是否是向前追加（用于保持滚动位置） */
   const lastUpdateWasPrependRef = useRef(false);
   /** 是否由历史记录选择触发加载（仅在 onPick 时为真） */
   const continueRef = useRef(false);
+  /** 最近一次点击的历史 record，用于零 session 记录兜底展示 */
+  const selectedHistoryRecordRef = useRef<AgentChatRecord | null>(null);
   /** 会话加载互斥锁，避免重复触发 */
   const sessionsFetchLockRef = useRef(false);
   /** 是否允许分页加载（滚动增页/请求下一页的开关） */
@@ -207,6 +400,18 @@ const Chat: React.FC = () => {
       ...prev,
       [mid]: [...(prev[mid] || []), tc],
     }));
+    appendArtifactsForMessage(
+      setArtifactsByMsg,
+      mid,
+      normalizeArtifactPayload(tc.output || event.payload),
+    );
+  }, []);
+
+  const onArtifact = React.useCallback((event: PdcEventEnvelope) => {
+    const mid = assistantIdRef.current;
+    if (!mid) return;
+    const artifacts = normalizeArtifactPayload(event.payload);
+    appendArtifactsForMessage(setArtifactsByMsg, mid, artifacts);
   }, []);
 
   const handleSend = async () => {
@@ -276,6 +481,7 @@ const Chat: React.FC = () => {
         const _stop = dispatchSseChunk(chunk, {
           appendPdcEvent,
           onToolCall,
+          onArtifact,
           appendAssistant,
           assistantTextFromPdcEvent,
           onRecordId: (id: number) => {
@@ -320,6 +526,9 @@ const Chat: React.FC = () => {
         per_page: sessionsPerPage,
       });
       const rows = resp.data || [];
+      if (sessionsPage === 1) {
+        sessionsPagingEnabledRef.current = true;
+      }
       setSessionsTotal(resp.total || 0);
       setSessionsLoadedCount((prev) =>
         sessionsPage === 1 ? rows.length : prev + rows.length,
@@ -391,6 +600,27 @@ const Chat: React.FC = () => {
           }
         }
       }
+      if (sessionsPage === 1 && rows.length === 0) {
+        const fallback = selectedHistoryRecordRef.current;
+        const fallbackText = String(
+          pickText(fallback?.name) ??
+            pickText(fallback?.message) ??
+            pickText(fallback?.content) ??
+            pickText(fallback?.summary) ??
+            "",
+        ).trim();
+        if (fallback && fallbackText) {
+          const fallbackTs = fallback.created_at
+            ? new Date(fallback.created_at).getTime()
+            : Date.now();
+          list.push({
+            id: `record-${String(fallback.record_id ?? fallback.id ?? recordId)}-u`,
+            role: "user",
+            content: fallbackText,
+            createdAt: Number.isFinite(fallbackTs) ? fallbackTs : Date.now(),
+          });
+        }
+      }
       list.sort((a, b) => a.createdAt - b.createdAt);
       lastUpdateWasPrependRef.current = sessionsPage > 1;
       setMessages((prev) => {
@@ -432,7 +662,7 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     fetchSessions();
-  }, [recordId, sessionsPage, fetchSessions]);
+  }, [recordId, sessionsPage, sessionsReloadKey, fetchSessions]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -499,15 +729,19 @@ const Chat: React.FC = () => {
             setMessages([]);
             setSteps([]);
             setPdcEvents([]);
+            setToolCallsByMsg({});
+            setArtifactsByMsg({});
             streamAbortRef.current.aborted = false;
             abortCtrlRef.current?.abort();
             setStreaming(false);
             assistantIdRef.current = null;
             setRecordId(null);
+            selectedHistoryRecordRef.current = null;
             continueRef.current = false;
             setSessionsPage(1);
             setSessionsTotal(0);
             setSessionsLoadedCount(0);
+            setSessionsReloadKey((v) => v + 1);
           }}
         >
           新对话 +
@@ -799,6 +1033,9 @@ const Chat: React.FC = () => {
                       {toolCallsByMsg[m.id]?.length ? (
                         <ToolCallInline calls={toolCallsByMsg[m.id]} isDark={isDark} />
                       ) : null}
+                      {artifactsByMsg[m.id]?.length ? (
+                        <ArtifactDownloads artifacts={artifactsByMsg[m.id]} isDark={isDark} />
+                      ) : null}
                       <ReactMarkdown>{m.content}</ReactMarkdown>
                       {hoveredMsgId === m.id && (
                         <div
@@ -924,14 +1161,23 @@ const Chat: React.FC = () => {
         agentId={agentId}
         userId={String(identity?.id ?? "")}
         onClose={() => setHistoryVisible(false)}
-        onPick={(rid) => {
-          if (!Number.isNaN(rid) && rid !== recordId) {
+        onPick={(record) => {
+          const rid = Number(record.record_id ?? record.id);
+          if (!Number.isNaN(rid)) {
+            selectedHistoryRecordRef.current = record;
+            sessionsFetchLockRef.current = false;
             setMessages([]);
             setSteps([]);
             setPdcEvents([]);
+            setToolCallsByMsg({});
+            setArtifactsByMsg({});
             continueRef.current = true;
+            sessionsPagingEnabledRef.current = false;
             setSessionsPage(1);
+            setSessionsTotal(0);
+            setSessionsLoadedCount(0);
             setRecordId(rid);
+            setSessionsReloadKey((v) => v + 1);
           }
           setHistoryVisible(false);
         }}

@@ -16,7 +16,7 @@ type Props = {
   userId: string;
   currentRecordId?: number | null;
   onClose: () => void;
-  onPick: (recordId: number) => void;
+  onPick: (record: AgentChatRecord) => void;
 };
 
 const HistoryDrawer: React.FC<Props> = ({
@@ -172,7 +172,7 @@ const HistoryDrawer: React.FC<Props> = ({
               hoverable
               onClick={() => {
                 const rid2 = Number(h.record_id ?? h.id);
-                if (!Number.isNaN(rid2)) onPick(rid2);
+                if (!Number.isNaN(rid2)) onPick(h);
               }}
               style={{
                 cursor: "pointer",

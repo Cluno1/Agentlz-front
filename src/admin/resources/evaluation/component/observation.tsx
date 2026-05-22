@@ -29,6 +29,9 @@ import type { ListModelsNameSpace } from "../../../data/api/model/type";
 import { getStrategyOption } from "../../rag/rag/strategyOptions";
 import { wsClient } from "../../../data/wsClient";
 import type { WSMessage } from "../../../data/wsClient";
+import ToolCallInline from "../../chat/components/ToolCallInline";
+import type { ToolCall } from "../../../data/api/agent/type";
+import { useDarkMode } from "../../../data/hook/useDark";
 
 type Props = {
   active: "base" | "rag" | "mcp" | "model";
@@ -64,6 +67,9 @@ const Observation: React.FC<Props> = ({
   const [ragLoading, setRagLoading] = useState<boolean>(false);
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [ragPage, setRagPage] = useState<number>(1);
+  const [ragPerPage, setRagPerPage] = useState<number>(10);
+  const [ragTotal, setRagTotal] = useState<number>(0);
   const [pickStrategyVisible, setPickStrategyVisible] = useState(false);
   const [pickStrategyDoc, setPickStrategyDoc] =
     useState<ListRagDocsNameSpace.ListRagDocsResult | null>(null);
@@ -76,11 +82,17 @@ const Observation: React.FC<Props> = ({
   const [mcpScope, setMcpScope] = useState<"self" | "tenant" | "system">(
     "self",
   );
+  const [mcpPage, setMcpPage] = useState<number>(1);
+  const [mcpPerPage, setMcpPerPage] = useState<number>(10);
+  const [mcpTotal, setMcpTotal] = useState<number>(0);
   const [modelItems, setModelItems] = useState<
     ListModelsNameSpace.ListModelsResult[]
   >([]);
   const [modelLoading, setModelLoading] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
+  const [modelPage, setModelPage] = useState<number>(1);
+  const [modelPerPage, setModelPerPage] = useState<number>(10);
+  const [modelTotal, setModelTotal] = useState<number>(0);
   const [selectedModelName, setSelectedModelName] = useState<string>("");
 
   const isDefaultTenant =
@@ -96,20 +108,25 @@ const Observation: React.FC<Props> = ({
       silent?: boolean;
       scope?: "self" | "tenant" | "system";
       title?: string;
+      page?: number;
+      perPage?: number;
     }) => {
       setRagLoading(true);
       try {
         const targetScope = opts?.scope ?? scope;
         const targetTitle = opts?.title ?? titleQuery;
+        const targetPage = opts?.page ?? ragPage;
+        const targetPerPage = opts?.perPage ?? ragPerPage;
         const resp = await listDocuments({
-          page: 1,
-          perPage: 10,
+          page: targetPage,
+          perPage: targetPerPage,
           sortField: "id",
           sortOrder: "DESC",
           filter: { disabled: false, status: "success", title: targetTitle },
           type: targetScope,
         });
         setDocs(resp.data || []);
+        setRagTotal(resp.total || 0);
       } catch {
         if (!opts?.silent)
           Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
@@ -117,7 +134,7 @@ const Observation: React.FC<Props> = ({
         setRagLoading(false);
       }
     },
-    [scope, t, titleQuery],
+    [scope, t, titleQuery, ragPage, ragPerPage],
   );
 
   const openStrategyDetail = (strategyId: string | number) => {
@@ -132,15 +149,16 @@ const Observation: React.FC<Props> = ({
     const run = async () => {
       setMcpLoading(true);
       try {
-        const { data } = await listMcps({
-          page: 1,
-          perPage: 10,
+        const { data, total } = await listMcps({
+          page: mcpPage,
+          perPage: mcpPerPage,
           sortField: "id",
           sortOrder: "DESC",
           filter: { q: mcpQuery },
           type: mcpScope,
         });
         setMcpItems(data || []);
+        setMcpTotal(total || 0);
       } catch {
         void 0;
       } finally {
@@ -148,7 +166,7 @@ const Observation: React.FC<Props> = ({
       }
     };
     void run();
-  }, [mcpScope, mcpQuery]);
+  }, [mcpScope, mcpQuery, mcpPage, mcpPerPage]);
 
   useEffect(() => {
     const run = async () => {
@@ -156,14 +174,15 @@ const Observation: React.FC<Props> = ({
       setModelLoading(true);
       try {
         const resp = await listModels({
-          page: 1,
-          perPage: 20,
+          page: modelPage,
+          perPage: modelPerPage,
           sortField: "id",
           sortOrder: "DESC",
           filter: { q: modelQuery },
           type: "system",
         });
         setModelItems(resp?.data || []);
+        setModelTotal(resp?.total || 0);
       } catch {
         void 0;
       } finally {
@@ -171,7 +190,7 @@ const Observation: React.FC<Props> = ({
       }
     };
     void run();
-  }, [modelSource, modelQuery]);
+  }, [modelSource, modelQuery, modelPage, modelPerPage]);
 
   useEffect(() => {
     if (modelSource !== "system") {
@@ -516,8 +535,9 @@ const Observation: React.FC<Props> = ({
             <Button
               type={scope === "self" ? "primary" : "outline"}
               onClick={() => {
+                setRagPage(1);
                 setScope("self");
-                void fetchRagDocs({ silent: true, scope: "self" });
+                void fetchRagDocs({ silent: true, scope: "self", page: 1 });
               }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
@@ -526,8 +546,9 @@ const Observation: React.FC<Props> = ({
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => {
+                  setRagPage(1);
                   setScope("tenant");
-                  void fetchRagDocs({ silent: true, scope: "tenant" });
+                  void fetchRagDocs({ silent: true, scope: "tenant", page: 1 });
                 }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
@@ -536,8 +557,9 @@ const Observation: React.FC<Props> = ({
             <Button
               type={scope === "system" ? "primary" : "outline"}
               onClick={() => {
+                setRagPage(1);
                 setScope("system");
-                void fetchRagDocs({ silent: true, scope: "system" });
+                void fetchRagDocs({ silent: true, scope: "system", page: 1 });
               }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
@@ -554,9 +576,19 @@ const Observation: React.FC<Props> = ({
             placeholder={t("rag.ui.searchPlaceholder", { _: "按名称搜索" })}
             value={titleQuery}
             onChange={setTitleQuery}
-            onPressEnter={fetchRagDocs}
+            onPressEnter={() => {
+              setRagPage(1);
+              void fetchRagDocs({ page: 1 });
+            }}
           />
-          <Button type="primary" onClick={fetchRagDocs} loading={ragLoading}>
+          <Button
+            type="primary"
+            onClick={() => {
+              setRagPage(1);
+              void fetchRagDocs({ page: 1 });
+            }}
+            loading={ragLoading}
+          >
             {t("rag.ui.search", { _: "搜索" })}
           </Button>
         </Space>
@@ -567,7 +599,17 @@ const Observation: React.FC<Props> = ({
         columns={ragColumns}
         data={docs}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          current: ragPage,
+          pageSize: ragPerPage,
+          total: ragTotal,
+          showTotal: true,
+          onChange: setRagPage,
+          onPageSizeChange: (size) => {
+            setRagPerPage(size);
+            setRagPage(1);
+          },
+        }}
       />
       <Modal
         title={t("rag.ui.strategySelect", { _: "选择切割策略" })}
@@ -633,21 +675,30 @@ const Observation: React.FC<Props> = ({
           <Button.Group>
             <Button
               type={mcpScope === "self" ? "primary" : "outline"}
-              onClick={() => setMcpScope("self")}
+              onClick={() => {
+                setMcpPage(1);
+                setMcpScope("self");
+              }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
             {!isDefaultTenant && (
               <Button
                 type={mcpScope === "tenant" ? "primary" : "outline"}
-                onClick={() => setMcpScope("tenant")}
+                onClick={() => {
+                  setMcpPage(1);
+                  setMcpScope("tenant");
+                }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
             <Button
               type={mcpScope === "system" ? "primary" : "outline"}
-              onClick={() => setMcpScope("system")}
+              onClick={() => {
+                setMcpPage(1);
+                setMcpScope("system");
+              }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>
@@ -662,7 +713,10 @@ const Observation: React.FC<Props> = ({
             style={{ width: 240 }}
             placeholder={t("mcpTools.ui.searchPlaceholder", { _: "搜索" })}
             value={mcpQuery}
-            onChange={setMcpQuery}
+            onChange={(value) => {
+              setMcpPage(1);
+              setMcpQuery(value);
+            }}
           />
         </Space>
       </div>
@@ -672,7 +726,17 @@ const Observation: React.FC<Props> = ({
         columns={mcpColumns}
         data={mcpItems}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          current: mcpPage,
+          pageSize: mcpPerPage,
+          total: mcpTotal,
+          showTotal: true,
+          onChange: setMcpPage,
+          onPageSizeChange: (size) => {
+            setMcpPerPage(size);
+            setMcpPage(1);
+          },
+        }}
       />
     </Card>
   );
@@ -798,7 +862,10 @@ const Observation: React.FC<Props> = ({
             style={{ width: 240 }}
             placeholder={t("model.ui.searchPlaceholder", { _: "搜索模型" })}
             value={modelQuery}
-            onChange={setModelQuery}
+            onChange={(value) => {
+              setModelPage(1);
+              setModelQuery(value);
+            }}
           />
         </Space>
       </div>
@@ -808,7 +875,17 @@ const Observation: React.FC<Props> = ({
         columns={modelColumns}
         data={modelItems}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          current: modelPage,
+          pageSize: modelPerPage,
+          total: modelTotal,
+          showTotal: true,
+          onChange: setModelPage,
+          onPageSizeChange: (size) => {
+            setModelPerPage(size);
+            setModelPage(1);
+          },
+        }}
       />
     </Card>
   );
@@ -1107,8 +1184,10 @@ const Observation: React.FC<Props> = ({
       input_tokens?: number;
       output_tokens?: number;
       model_name?: string;
+      tool_calls?: ToolCall[];
     }>
   >([]);
+  const isDark = useDarkMode();
 
   const buildObsDetailText = (row: (typeof obsRows)[number]): string => {
     const messagesText =
@@ -1193,6 +1272,7 @@ const Observation: React.FC<Props> = ({
         history?: string;
         message?: string;
         messages?: unknown;
+        tool_calls?: ToolCall[];
         metrics?: {
           rag_time_ms?: number;
           model_time_ms?: number;
@@ -1247,10 +1327,14 @@ const Observation: React.FC<Props> = ({
             ? m.input_tokens
             : undefined,
         output_tokens:
-          typeof m.output_tokens === "number" && Number.isFinite(m.output_tokens)
+          typeof m.output_tokens === "number" &&
+          Number.isFinite(m.output_tokens)
             ? m.output_tokens
             : undefined,
         model_name: typeof m.model_name === "string" ? m.model_name : undefined,
+        tool_calls: Array.isArray(data.tool_calls)
+          ? (data.tool_calls as ToolCall[])
+          : [],
       };
       setObsRows((prev) => {
         const rid = row.record_id;
@@ -1266,6 +1350,8 @@ const Observation: React.FC<Props> = ({
         const next = prev.map((it) => {
           if (it.record_id !== rid) return it;
           merged = true;
+          const incomingTools = Array.isArray(row.tool_calls) ? row.tool_calls : [];
+          const existingTools = Array.isArray(it.tool_calls) ? it.tool_calls : [];
           return {
             ...it,
             agent_id: hasValue(row.agent_id) ? row.agent_id : it.agent_id,
@@ -1291,6 +1377,9 @@ const Observation: React.FC<Props> = ({
             model_name: hasValue(row.model_name)
               ? row.model_name
               : it.model_name,
+            tool_calls: incomingTools.length
+              ? [...existingTools, ...incomingTools]
+              : existingTools,
           };
         });
         if (merged) return next;
@@ -1443,7 +1532,12 @@ const Observation: React.FC<Props> = ({
 
   const wsPreview = (
     <Card
-      style={{ boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)", marginBottom: 12 }}
+      style={{
+        border: "1px solid #E5E6EB",
+        borderRadius: 8,
+        boxShadow: "0 10px 28px rgba(29, 33, 41, 0.06)",
+        marginBottom: 12,
+      }}
     >
       <div
         style={{
@@ -1466,7 +1560,7 @@ const Observation: React.FC<Props> = ({
       </div>
       <Divider style={{ margin: "8px 0" }} />
       <Table
-        style={{ maxWidth: "80%" }}
+        style={{ maxWidth: "100%" }}
         columns={obsColumns}
         data={obsRows}
         rowKey="id"
@@ -1478,6 +1572,9 @@ const Observation: React.FC<Props> = ({
               t("rag.ui.observationDetail", { _: "观测上下文" }),
             );
             setObsDetailText(buildObsDetailText(record));
+            setObsDetailTools(
+              Array.isArray(record.tool_calls) ? record.tool_calls : [],
+            );
             setObsDetailVisible(true);
           },
         })}
@@ -1487,6 +1584,7 @@ const Observation: React.FC<Props> = ({
   const [obsDetailVisible, setObsDetailVisible] = useState(false);
   const [obsDetailTitle, setObsDetailTitle] = useState("");
   const [obsDetailText, setObsDetailText] = useState("");
+  const [obsDetailTools, setObsDetailTools] = useState<ToolCall[]>([]);
 
   return (
     <div style={{ flex: 1 }}>
@@ -1509,6 +1607,12 @@ const Observation: React.FC<Props> = ({
               }}
             >
               {obsDetailText || "-"}
+              {obsDetailTools.length > 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  <b>{t("rag.ui.toolCalls", { _: "工具调用" })}：</b>
+                  <ToolCallInline calls={obsDetailTools} isDark={isDark} />
+                </div>
+              ) : null}
             </div>
           </Modal>
         </>

@@ -221,10 +221,11 @@ export default {
     },
   },
   mcpTools: {
-    title: "mcp工具",
+    title: "MCP 工具目录",
     placeholder: "这里是 mcp 工具页面的占位内容。",
     ui: {
-      subtitle: "收录 30,000+ MCP Servers 的全球平台",
+      subtitle:
+        "面向企业场景的 MCP 工具目录，统一管理搜索、文件、生成、通知与业务自动化能力。",
       searchPlaceholder: "按名称搜索",
       categories: {
         all: "全部",
@@ -234,7 +235,7 @@ export default {
         other: "其他",
       },
       stats: {
-        total: "已收录",
+        total: "当前工具",
         today: "今日新增",
       },
       install: "复制安装命令",

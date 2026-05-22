@@ -9,6 +9,7 @@ export type SseChunk = AgentChatStreamChunk & { record_id?: number };
 export interface SseCtx {
   appendPdcEvent: (e: PdcEventEnvelope) => void;
   onToolCall: (e: PdcEventEnvelope) => void;
+  onArtifact: (e: PdcEventEnvelope) => void;
   appendAssistant: (s: string) => void;
   assistantTextFromPdcEvent: (e: PdcEventEnvelope) => string;
   onRecordId: (id: number) => void;
@@ -22,8 +23,14 @@ const HANDLERS: Record<string, Handler> = {
     ctx.onToolCall(ev);
     ctx.appendPdcEvent(ev);
   },
+  artifact: (chunk, ctx) => {
+    const ev = chunk.event as PdcEventEnvelope;
+    ctx.onArtifact(ev);
+    ctx.appendPdcEvent(ev);
+  },
   final: (chunk, ctx) => {
     const ev = chunk.event as PdcEventEnvelope;
+    ctx.onArtifact(ev);
     ctx.appendPdcEvent(ev);
     ctx.appendAssistant(ctx.assistantTextFromPdcEvent(ev));
   },
@@ -39,11 +46,12 @@ const HANDLERS: Record<string, Handler> = {
 
 export function classifySseChunk(
   chunk: SseChunk,
-): "tool" | "final" | "pdc" | "text" {
+): "tool" | "artifact" | "final" | "pdc" | "text" {
   const ev = chunk && (chunk as { event?: PdcEventEnvelope }).event;
   if (!ev) return "text";
   const name = String(ev.evt || "");
   if (name === "call.start" || name === "call.end") return "tool";
+  if (name === "artifact.created") return "artifact";
   if (name === "final") return "final";
   return "pdc";
 }

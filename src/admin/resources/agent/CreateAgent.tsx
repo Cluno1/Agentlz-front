@@ -47,6 +47,9 @@ const CreateAgent: React.FC = () => {
   >({});
   const [titleQuery, setTitleQuery] = useState<string>("");
   const [scope, setScope] = useState<"self" | "tenant" | "system">("tenant");
+  const [ragPage, setRagPage] = useState<number>(1);
+  const [ragPerPage, setRagPerPage] = useState<number>(10);
+  const [ragTotal, setRagTotal] = useState<number>(0);
   const [pickStrategyVisible, setPickStrategyVisible] =
     useState<boolean>(false);
   const [pickStrategyDoc, setPickStrategyDoc] =
@@ -61,6 +64,9 @@ const CreateAgent: React.FC = () => {
   const [mcpScope, setMcpScope] = useState<"self" | "tenant" | "system">(
     "self",
   );
+  const [mcpPage, setMcpPage] = useState<number>(1);
+  const [mcpPerPage, setMcpPerPage] = useState<number>(10);
+  const [mcpTotal, setMcpTotal] = useState<number>(0);
   const [modelItems, setModelItems] = useState<
     ListModelsNameSpace.ListModelsResult[]
   >([]);
@@ -100,20 +106,25 @@ const CreateAgent: React.FC = () => {
     silent?: boolean;
     scope?: "self" | "tenant" | "system";
     title?: string;
+    page?: number;
+    perPage?: number;
   }) => {
     setRagLoading(true);
     try {
       const targetScope = opts?.scope ?? scope;
       const targetTitle = opts?.title ?? titleQuery;
+      const targetPage = opts?.page ?? ragPage;
+      const targetPerPage = opts?.perPage ?? ragPerPage;
       const resp = await listDocuments({
-        page: 1,
-        perPage: 10,
+        page: targetPage,
+        perPage: targetPerPage,
         sortField: "id",
         sortOrder: "DESC",
         filter: { disabled: false, status: "success", title: targetTitle },
         type: targetScope,
       });
       setDocs(resp.data || []);
+      setRagTotal(resp.total || 0);
     } catch {
       if (!opts?.silent)
         Message.error(t("rag.msg.loadFail", { _: "加载失败" }));
@@ -122,18 +133,24 @@ const CreateAgent: React.FC = () => {
     }
   };
 
-  const fetchMcps = async (opts?: { silent?: boolean; scope?: "self" | "tenant" | "system" }) => {
+  const fetchMcps = async (opts?: {
+    silent?: boolean;
+    scope?: "self" | "tenant" | "system";
+    page?: number;
+    perPage?: number;
+  }) => {
     setMcpLoading(true);
     try {
-      const { data } = await listMcps({
-        page: 1,
-        perPage: 10,
+      const { data, total } = await listMcps({
+        page: opts?.page ?? mcpPage,
+        perPage: opts?.perPage ?? mcpPerPage,
         sortField: "id",
         sortOrder: "DESC",
         filter: { q: mcpQuery },
         type: opts?.scope ?? mcpScope,
       });
       setMcpItems(data || []);
+      setMcpTotal(total || 0);
     } catch {
       if (!opts?.silent)
         Message.error(t("mcpTools.msg.loadFail", { _: "加载失败" }));
@@ -284,6 +301,8 @@ const CreateAgent: React.FC = () => {
           meta.chatopenai_api_key = values.chatopenai_api_key;
         if (values.chatopenai_base_url)
           meta.chatopenai_base_url = values.chatopenai_base_url;
+        if (values.chatopenai_model)
+          meta.model_name = values.chatopenai_model;
       }
       const payload = {
         name: values.name,
@@ -578,8 +597,9 @@ const CreateAgent: React.FC = () => {
             <Button
               type={scope === "self" ? "primary" : "outline"}
               onClick={() => {
+                setRagPage(1);
                 setScope("self");
-                void fetchRagDocs({ silent: true, scope: "self" });
+                void fetchRagDocs({ silent: true, scope: "self", page: 1 });
               }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
@@ -588,8 +608,9 @@ const CreateAgent: React.FC = () => {
               <Button
                 type={scope === "tenant" ? "primary" : "outline"}
                 onClick={() => {
+                  setRagPage(1);
                   setScope("tenant");
-                  void fetchRagDocs({ silent: true, scope: "tenant" });
+                  void fetchRagDocs({ silent: true, scope: "tenant", page: 1 });
                 }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
@@ -598,8 +619,9 @@ const CreateAgent: React.FC = () => {
             <Button
               type={scope === "system" ? "primary" : "outline"}
               onClick={() => {
+                setRagPage(1);
                 setScope("system");
-                void fetchRagDocs({ silent: true, scope: "system" });
+                void fetchRagDocs({ silent: true, scope: "system", page: 1 });
               }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
@@ -616,9 +638,19 @@ const CreateAgent: React.FC = () => {
             placeholder={t("rag.ui.searchPlaceholder", { _: "按名称搜索" })}
             value={titleQuery}
             onChange={setTitleQuery}
-            onPressEnter={fetchRagDocs}
+            onPressEnter={() => {
+              setRagPage(1);
+              void fetchRagDocs({ page: 1 });
+            }}
           />
-          <Button type="primary" onClick={fetchRagDocs} loading={ragLoading}>
+          <Button
+            type="primary"
+            onClick={() => {
+              setRagPage(1);
+              void fetchRagDocs({ page: 1 });
+            }}
+            loading={ragLoading}
+          >
             {t("rag.ui.search", { _: "搜索" })}
           </Button>
         </Space>
@@ -628,7 +660,21 @@ const CreateAgent: React.FC = () => {
         columns={ragColumns}
         data={docs}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          current: ragPage,
+          pageSize: ragPerPage,
+          total: ragTotal,
+          showTotal: true,
+          onChange: (page) => {
+            setRagPage(page);
+            void fetchRagDocs({ page });
+          },
+          onPageSizeChange: (size) => {
+            setRagPerPage(size);
+            setRagPage(1);
+            void fetchRagDocs({ page: 1, perPage: size });
+          },
+        }}
       />
       <Modal
         title={t("rag.ui.strategySelect", { _: "选择切割策略" })}
@@ -694,21 +740,33 @@ const CreateAgent: React.FC = () => {
           <Button.Group>
             <Button
               type={mcpScope === "self" ? "primary" : "outline"}
-              onClick={() => { setMcpScope("self"); void fetchMcps({ scope: "self" }); }}
+              onClick={() => {
+                setMcpPage(1);
+                setMcpScope("self");
+                void fetchMcps({ scope: "self", page: 1 });
+              }}
             >
               {t("rag.ui.tabs.self", { _: "个人" })}
             </Button>
             {!isSuperAdmin && !isDefaultTenant && (
               <Button
                 type={mcpScope === "tenant" ? "primary" : "outline"}
-                onClick={() => { setMcpScope("tenant"); void fetchMcps({ scope: "tenant" }); }}
+                onClick={() => {
+                  setMcpPage(1);
+                  setMcpScope("tenant");
+                  void fetchMcps({ scope: "tenant", page: 1 });
+                }}
               >
                 {t("rag.ui.tabs.tenant", { _: "租户" })}
               </Button>
             )}
             <Button
               type={mcpScope === "system" ? "primary" : "outline"}
-              onClick={() => { setMcpScope("system"); void fetchMcps({ scope: "system" }); }}
+              onClick={() => {
+                setMcpPage(1);
+                setMcpScope("system");
+                void fetchMcps({ scope: "system", page: 1 });
+              }}
             >
               {t("rag.ui.tabs.system", { _: "系统" })}
             </Button>
@@ -725,7 +783,14 @@ const CreateAgent: React.FC = () => {
             value={mcpQuery}
             onChange={setMcpQuery}
           />
-          <Button type="primary" onClick={fetchMcps} loading={mcpLoading}>
+          <Button
+            type="primary"
+            onClick={() => {
+              setMcpPage(1);
+              void fetchMcps({ page: 1 });
+            }}
+            loading={mcpLoading}
+          >
             {t("rag.ui.search", { _: "搜索" })}
           </Button>
         </Space>
@@ -735,7 +800,21 @@ const CreateAgent: React.FC = () => {
         columns={mcpColumns}
         data={mcpItems}
         rowKey="id"
-        pagination={false}
+        pagination={{
+          current: mcpPage,
+          pageSize: mcpPerPage,
+          total: mcpTotal,
+          showTotal: true,
+          onChange: (page) => {
+            setMcpPage(page);
+            void fetchMcps({ page });
+          },
+          onPageSizeChange: (size) => {
+            setMcpPerPage(size);
+            setMcpPage(1);
+            void fetchMcps({ page: 1, perPage: size });
+          },
+        }}
       />
     </Card>
   );
@@ -1017,6 +1096,22 @@ const CreateAgent: React.FC = () => {
                           "agent.ui.chatopenaiBaseUrlPlaceholder",
                           {
                             _: "可选，例如 https://api.openai.com/v1",
+                          },
+                        )}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label={t("agent.ui.chatopenaiModel", {
+                        _: "模型名称",
+                      })}
+                      field="chatopenai_model"
+                    >
+                      <Input
+                        allowClear
+                        placeholder={t(
+                          "agent.ui.chatopenaiModelPlaceholder",
+                          {
+                            _: "需与上游 API 一致，例如 deepseek-chat、DeepSeek-V3.2",
                           },
                         )}
                       />
